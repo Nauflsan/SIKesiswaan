@@ -3,7 +3,12 @@
  * FIREBASE KASUS SERVICE (src/services/firebase/kasus.js)
  * ============================================================================
  * Mengelola pencatatan kasus pelanggaran, Point Snapshot,
- * dan rekalkulasi akumulasi poin kedisiplinan & status SP secara atomik.
+ * dan pembaruan akumulasi poin kedisiplinan & status SP.
+ *
+ * Tambah/hapus kasus dan penyesuaian poin siswa dijalankan dalam SATU transaksi
+ * Firestore (runTransaction), sehingga keduanya berhasil bersama atau gagal bersama.
+ * Poin siswa diperbarui dengan selisih (delta) dari dokumen siswa yang dibaca di
+ * dalam transaksi, karena SDK klien tidak mendukung query di dalam transaksi.
  */
 
 import { db } from '../../lib/firebase.js';
@@ -12,17 +17,34 @@ import {
   doc,
   getDoc,
   getDocs,
-  setDoc,
   updateDoc,
+  runTransaction,
   query,
   where,
   orderBy
 } from 'firebase/firestore';
 import { hitungStatusSP } from '../../lib/helpers.js';
-import { firebaseSettingsService } from './settings.js';
+import { firebaseSettingsService, defaultSchoolSettings } from './settings.js';
 import { firebaseLogService } from './log.js';
 
 const COLLECTION_NAME = 'kasus';
+const SETTINGS_REF = doc(db, 'settings', 'global');
+
+// Field kasus yang boleh diedit. Poin, siswa, dan kategori terkunci (snapshot):
+// untuk mengoreksinya, hapus kasus lalu buat ulang.
+const UPDATABLE_FIELDS = ['status', 'deskripsi', 'tanggal'];
+
+/**
+ * Menghitung total poin dan status SP baru setelah ada selisih poin (delta).
+ */
+const applyPoinDelta = (siswa, delta, settingsSnap) => {
+  const settings = {
+    ...defaultSchoolSettings,
+    ...(settingsSnap.exists() ? settingsSnap.data() : {})
+  };
+  const totalPoin = Math.max(0, Number(siswa.totalPoin || 0) + delta);
+  return { totalPoin, statusSP: hitungStatusSP(totalPoin, settings) };
+};
 
 export const firebaseKasusService = {
   /**
@@ -76,56 +98,63 @@ export const firebaseKasusService = {
   },
 
   /**
-   * LOGIKA UTAMA: Pencatatan Kasus Baru (Point Snapshot & Atomic Recalculation).
+   * LOGIKA UTAMA: Pencatatan Kasus Baru (Point Snapshot + update poin siswa dalam satu transaksi).
    */
   create: async (kasusData, currentUser) => {
-    // 1. Validasi keberadaan siswa
     const siswaRef = doc(db, 'siswa', kasusData.siswaId);
-    const siswaSnap = await getDoc(siswaRef);
-    if (!siswaSnap.exists()) throw new Error('Siswa tidak ditemukan');
-    const siswa = siswaSnap.data();
-
-    // 2. Validasi kategori untuk snapshot poin
     const kategoriRef = doc(db, 'kategori', kasusData.kategoriId);
-    const kategoriSnap = await getDoc(kategoriRef);
-    if (!kategoriSnap.exists()) throw new Error('Kategori pelanggaran tidak ditemukan');
-    const kategori = kategoriSnap.data();
-
-    // Snapshot poin: mengunci poin saat kejadian berlangsung
-    const poinSnapshot = Number(kasusData.poin !== undefined ? kasusData.poin : kategori.poin);
     const newId = 'ks_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    const kasusRef = doc(db, COLLECTION_NAME, newId);
+    const nowIso = new Date().toISOString();
 
-    const newKasus = {
-      id: newId,
-      siswaId: siswaSnap.id,
-      siswaNama: siswa.nama,
-      siswaNisn: siswa.nisn,
-      siswaKelas: siswa.kelas,
-      kategoriId: kategoriSnap.id,
-      kategoriNama: kategori.nama,
-      poin: poinSnapshot,
-      tanggal: kasusData.tanggal || new Date().toISOString().split('T')[0],
-      deskripsi: kasusData.deskripsi || null,
-      status: kasusData.status || 'baru',
-      createdBy: currentUser?.id || 'sys',
-      createdByNama: currentUser?.nama || 'Sistem',
-      deletedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    const { newKasus, siswa, kategori } = await runTransaction(db, async (tx) => {
+      // Semua pembacaan harus dilakukan sebelum penulisan pertama
+      const siswaSnap = await tx.get(siswaRef);
+      if (!siswaSnap.exists()) throw new Error('Siswa tidak ditemukan');
+      const kategoriSnap = await tx.get(kategoriRef);
+      if (!kategoriSnap.exists()) throw new Error('Kategori pelanggaran tidak ditemukan');
+      const settingsSnap = await tx.get(SETTINGS_REF);
 
-    // 3. Simpan dokumen kasus ke Firestore
-    await setDoc(doc(db, COLLECTION_NAME, newId), newKasus);
+      const siswa = siswaSnap.data();
+      const kategori = kategoriSnap.data();
 
-    // 4. Rekalkulasi atomik total poin siswa dari seluruh kasus aktifnya
-    await firebaseKasusService.recalculateSiswaPoints(siswaSnap.id);
+      // Snapshot poin: mengunci poin saat kejadian berlangsung
+      const poin = Number(kasusData.poin !== undefined ? kasusData.poin : kategori.poin);
+      if (!Number.isFinite(poin) || poin < 0) throw new Error('Poin pelanggaran tidak valid');
 
-    // 5. Catat audit trail log aktivitas
+      const newKasus = {
+        id: newId,
+        siswaId: siswaSnap.id,
+        siswaNama: siswa.nama,
+        siswaNisn: siswa.nisn,
+        siswaKelas: siswa.kelas,
+        kategoriId: kategoriSnap.id,
+        kategoriNama: kategori.nama,
+        poin,
+        tanggal: kasusData.tanggal || nowIso.split('T')[0],
+        deskripsi: kasusData.deskripsi || null,
+        status: kasusData.status || 'baru',
+        createdBy: currentUser?.id || 'sys',
+        createdByNama: currentUser?.nama || 'Sistem',
+        deletedAt: null,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      };
+
+      const { totalPoin, statusSP } = applyPoinDelta(siswa, poin, settingsSnap);
+
+      tx.set(kasusRef, newKasus);
+      tx.update(siswaRef, { totalPoin, statusSP, updatedAt: nowIso });
+
+      return { newKasus, siswa, kategori };
+    });
+
+    // Audit trail dicatat setelah transaksi berhasil (kegagalan log tidak membatalkan kasus)
     await firebaseLogService.create({
       userId: currentUser?.id,
       userNama: currentUser?.nama,
       aksi: 'tambah_kasus',
-      detail: `Menambah kasus ${siswa.nama} — ${kategori.nama} (${poinSnapshot} poin)`,
+      detail: `Menambah kasus ${siswa.nama} — ${kategori.nama} (${newKasus.poin} poin)`,
       targetId: newId,
       targetType: 'kasus'
     });
@@ -134,7 +163,8 @@ export const firebaseKasusService = {
   },
 
   /**
-   * Memperbarui status penanganan kasus atau keterangan kronologi
+   * Memperbarui status penanganan, kronologi, atau tanggal kasus.
+   * Poin tidak bisa diubah di sini (lihat UPDATABLE_FIELDS).
    */
   update: async (id, data, currentUser) => {
     const kasusRef = doc(db, COLLECTION_NAME, id);
@@ -142,15 +172,12 @@ export const firebaseKasusService = {
     if (!snap.exists()) throw new Error('Kasus tidak ditemukan');
     const oldKasus = snap.data();
 
-    const updateData = {
-      ...data,
-      updatedAt: new Date().toISOString()
-    };
+    const updateData = { updatedAt: new Date().toISOString() };
+    for (const key of UPDATABLE_FIELDS) {
+      if (data[key] !== undefined) updateData[key] = data[key];
+    }
 
     await updateDoc(kasusRef, updateData);
-
-    // Rekalkulasi poin siswa jika ada perubahan poin
-    await firebaseKasusService.recalculateSiswaPoints(oldKasus.siswaId);
 
     await firebaseLogService.create({
       userId: currentUser?.id,
@@ -165,37 +192,59 @@ export const firebaseKasusService = {
   },
 
   /**
-   * SOFT DELETE: Menghapus kasus tanpa memusnahkan riwayat audit
+   * SOFT DELETE: menandai kasus terhapus dan mengurangi poin siswa dalam satu transaksi.
    */
   delete: async (id, currentUser) => {
     const kasusRef = doc(db, COLLECTION_NAME, id);
-    const snap = await getDoc(kasusRef);
-    if (!snap.exists()) throw new Error('Kasus tidak ditemukan');
-    const oldKasus = snap.data();
+    const nowIso = new Date().toISOString();
 
-    // Beri tanda soft delete
-    await updateDoc(kasusRef, {
-      deletedAt: new Date().toISOString(),
-      deletedBy: currentUser?.id || 'sys'
+    const deleted = await runTransaction(db, async (tx) => {
+      const kasusSnap = await tx.get(kasusRef);
+      if (!kasusSnap.exists()) throw new Error('Kasus tidak ditemukan');
+      const kasus = kasusSnap.data();
+
+      // Sudah terhapus sebelumnya: jangan kurangi poin dua kali
+      if (kasus.deletedAt) return null;
+
+      const siswaRef = doc(db, 'siswa', kasus.siswaId);
+      const siswaSnap = await tx.get(siswaRef);
+      const settingsSnap = await tx.get(SETTINGS_REF);
+
+      tx.update(kasusRef, {
+        deletedAt: nowIso,
+        deletedBy: currentUser?.id || 'sys',
+        updatedAt: nowIso
+      });
+
+      if (siswaSnap.exists()) {
+        const { totalPoin, statusSP } = applyPoinDelta(
+          siswaSnap.data(),
+          -Number(kasus.poin || 0),
+          settingsSnap
+        );
+        tx.update(siswaRef, { totalPoin, statusSP, updatedAt: nowIso });
+      }
+
+      return kasus;
     });
 
-    // Otomatis kurangi poin aktif siswa
-    await firebaseKasusService.recalculateSiswaPoints(oldKasus.siswaId);
-
-    await firebaseLogService.create({
-      userId: currentUser?.id,
-      userNama: currentUser?.nama,
-      aksi: 'hapus_kasus',
-      detail: `Menghapus kasus ${oldKasus.siswaNama} — ${oldKasus.kategoriNama} (${oldKasus.poin} poin)`,
-      targetId: id,
-      targetType: 'kasus'
-    });
+    if (deleted) {
+      await firebaseLogService.create({
+        userId: currentUser?.id,
+        userNama: currentUser?.nama,
+        aksi: 'hapus_kasus',
+        detail: `Menghapus kasus ${deleted.siswaNama} — ${deleted.kategoriNama} (${deleted.poin} poin)`,
+        targetId: id,
+        targetType: 'kasus'
+      });
+    }
 
     return true;
   },
 
   /**
-   * Fungsi pembantu: Menghitung ulang total poin aktif siswa dan memperbarui status SP
+   * Alat perbaikan: menghitung ulang total poin siswa dari seluruh kasus aktifnya
+   * (tidak dipakai alur normal; berguna bila data poin pernah tidak sinkron).
    */
   recalculateSiswaPoints: async (siswaId) => {
     try {

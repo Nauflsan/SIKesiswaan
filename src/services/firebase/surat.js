@@ -11,16 +11,17 @@ import {
   doc,
   getDoc,
   getDocs,
-  setDoc,
   updateDoc,
+  runTransaction,
   query,
   orderBy
 } from 'firebase/firestore';
 import { formatRomawi } from '../../lib/helpers.js';
-import { firebaseSettingsService } from './settings.js';
+import { defaultSchoolSettings } from './settings.js';
 import { firebaseLogService } from './log.js';
 
 const COLLECTION_NAME = 'surat';
+const SETTINGS_REF = doc(db, 'settings', 'global');
 
 export const firebaseSuratService = {
   /**
@@ -56,70 +57,81 @@ export const firebaseSuratService = {
   },
 
   /**
-   * LOGIKA UTAMA: Pembuatan Dokumen Surat Peringatan dengan Penomoran Atomik
+   * LOGIKA UTAMA: Pembuatan Surat Peringatan dengan penomoran atomik.
+   * Counter nomor surat dan dokumen surat ditulis dalam SATU transaksi, sehingga
+   * dua pengguna yang menerbitkan surat bersamaan tidak akan mendapat nomor yang sama,
+   * dan nomor tidak hangus bila penyimpanan surat gagal.
    */
   create: async (suratData, currentUser) => {
-    // 1. Ambil data siswa dari Firestore untuk snapshot identitas di surat
     const siswaRef = doc(db, 'siswa', suratData.siswaId);
-    const siswaSnap = await getDoc(siswaRef);
-    if (!siswaSnap.exists()) throw new Error('Siswa tidak ditemukan');
-    const siswa = siswaSnap.data();
-
-    // 2. Ambil pengaturan penomoran surat
-    const settings = await firebaseSettingsService.get();
-
-    // Inkremen counter penomoran surat
-    const currentCounter = Number(settings.nomorSuratCounter || 1);
-    const newCounter = currentCounter + 1;
-
-    // Perbarui counter di settings
-    await firebaseSettingsService.update({ nomorSuratCounter: newCounter }, currentUser);
-
-    const now = new Date();
-    const bulanRomawi = formatRomawi(now.getMonth() + 1);
-    const tahun = now.getFullYear();
-    const urutStr = String(currentCounter).padStart(3, '0');
-
-    // Format penomoran otomatis
-    const formatTpl = settings.formatNomorSurat || '{{urut}}/{{jenis}}/{{kode}}/{{bulan-romawi}}/{{tahun}}';
-    const nomorSurat = formatTpl
-      .replace('{{urut}}', urutStr)
-      .replace('{{jenis}}', String(suratData.jenis || 'SP1').toUpperCase().replace('_', '-'))
-      .replace('{{kode}}', settings.kodeSekolah || 'SMK-KHP')
-      .replace('{{bulan-romawi}}', bulanRomawi)
-      .replace('{{tahun}}', tahun);
-
     const newId = 'srt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-    const newSurat = {
-      id: newId,
-      siswaId: siswaSnap.id,
-      siswaNama: siswa.nama || '',
-      siswaNisn: siswa.nisn || '',
-      siswaKelas: siswa.kelas || '',
-      totalPoin: Number(siswa.totalPoin || 0),
-      jenis: suratData.jenis || 'sp1',
-      nomorSurat,
-      nomorUrut: currentCounter,
-      perihal: suratData.perihal || `Surat Peringatan ${String(suratData.jenis || 'SP1').toUpperCase()}`,
-      tanggalSurat: suratData.tanggalSurat || now.toISOString().split('T')[0],
-      kasusIds: Array.isArray(suratData.kasusIds) ? suratData.kasusIds : [],
-      keteranganTambahan: suratData.keteranganTambahan || '',
-      panggilanOrtu: Boolean(suratData.panggilanOrtu),
-      keteranganPanggilan: suratData.keteranganPanggilan || '',
-      status: suratData.status || 'draft',
-      createdBy: currentUser?.id || 'sys',
-      createdByNama: currentUser?.nama || 'Sistem',
-      createdByNip: currentUser?.nip || '-',
-      createdAt: new Date().toISOString()
-    };
+    const suratRef = doc(db, COLLECTION_NAME, newId);
 
-    await setDoc(doc(db, COLLECTION_NAME, newId), newSurat);
+    const newSurat = await runTransaction(db, async (tx) => {
+      // Semua pembacaan harus dilakukan sebelum penulisan pertama
+      const siswaSnap = await tx.get(siswaRef);
+      if (!siswaSnap.exists()) throw new Error('Siswa tidak ditemukan');
+      const settingsSnap = await tx.get(SETTINGS_REF);
+      if (!settingsSnap.exists()) {
+        throw new Error('Pengaturan sekolah belum diinisialisasi. Minta Administrator membuka menu Pengaturan terlebih dahulu.');
+      }
+
+      const siswa = siswaSnap.data();
+      const settings = { ...defaultSchoolSettings, ...settingsSnap.data() };
+
+      const now = new Date();
+      const currentCounter = Number(settings.nomorSuratCounter || 1);
+      const bulanRomawi = formatRomawi(now.getMonth() + 1);
+      const tahun = now.getFullYear();
+      const urutStr = String(currentCounter).padStart(3, '0');
+
+      // Format penomoran otomatis
+      const formatTpl = settings.formatNomorSurat || '{{urut}}/{{jenis}}/{{kode}}/{{bulan-romawi}}/{{tahun}}';
+      const nomorSurat = formatTpl
+        .replace('{{urut}}', urutStr)
+        .replace('{{jenis}}', String(suratData.jenis || 'SP1').toUpperCase().replace('_', '-'))
+        .replace('{{kode}}', settings.kodeSekolah || 'SMK-KHP')
+        .replace('{{bulan-romawi}}', bulanRomawi)
+        .replace('{{tahun}}', tahun);
+
+      const surat = {
+        id: newId,
+        siswaId: siswaSnap.id,
+        siswaNama: siswa.nama || '',
+        siswaNisn: siswa.nisn || '',
+        siswaKelas: siswa.kelas || '',
+        totalPoin: Number(siswa.totalPoin || 0),
+        jenis: suratData.jenis || 'sp1',
+        nomorSurat,
+        nomorUrut: currentCounter,
+        perihal: suratData.perihal || `Surat Peringatan ${String(suratData.jenis || 'SP1').toUpperCase()}`,
+        tanggalSurat: suratData.tanggalSurat || now.toISOString().split('T')[0],
+        kasusIds: Array.isArray(suratData.kasusIds) ? suratData.kasusIds : [],
+        keteranganTambahan: suratData.keteranganTambahan || '',
+        panggilanOrtu: Boolean(suratData.panggilanOrtu),
+        keteranganPanggilan: suratData.keteranganPanggilan || '',
+        status: suratData.status || 'draft',
+        createdBy: currentUser?.id || 'sys',
+        createdByNama: currentUser?.nama || 'Sistem',
+        createdByNip: currentUser?.nip || '-',
+        createdAt: now.toISOString()
+      };
+
+      // Update PARSIAL (hanya counter): satu-satunya perubahan settings yang boleh dilakukan Guru BK
+      tx.update(SETTINGS_REF, {
+        nomorSuratCounter: currentCounter + 1,
+        updatedAt: now.toISOString()
+      });
+      tx.set(suratRef, surat);
+
+      return surat;
+    });
 
     await firebaseLogService.create({
       userId: currentUser?.id,
       userNama: currentUser?.nama,
       aksi: 'buat_surat',
-      detail: `Menerbitkan ${newSurat.perihal} No: ${nomorSurat} untuk ${newSurat.siswaNama}`,
+      detail: `Menerbitkan ${newSurat.perihal} No: ${newSurat.nomorSurat} untuk ${newSurat.siswaNama}`,
       targetId: newId,
       targetType: 'surat'
     });
