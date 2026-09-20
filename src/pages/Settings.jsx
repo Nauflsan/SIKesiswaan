@@ -472,7 +472,8 @@ export default function Settings() {
 
           {/* Users Table */}
           <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
-            <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-xs">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider text-[10px] font-semibold">
                 <tr>
                   <th className="py-3 px-4">Nama Pengguna</th>
@@ -554,6 +555,7 @@ export default function Settings() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Modal Add User (Admin Only) */}

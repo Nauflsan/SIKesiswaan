@@ -1,37 +1,13 @@
 import { Link, useLocation } from 'wouter-preact';
 import { useAuthStore } from '../../stores/authStore.js';
-import {
-  LayoutDashboard,
-  AlertTriangle,
-  Users,
-  Tag,
-  FileSpreadsheet,
-  FileText,
-  History,
-  Settings,
-  ShieldAlert,
-  LogOut
-} from 'lucide-preact';
+import { ShieldAlert, LogOut } from 'lucide-preact';
+import { navigation, canAccess, isActivePath } from './navigation.js';
 
 export default function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuthStore();
 
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-    { name: 'Data Kasus', href: '/kasus', icon: AlertTriangle },
-    { name: 'Daftar Siswa', href: '/siswa', icon: Users },
-    { name: 'Kategori Pelanggaran', href: '/kategori', icon: Tag, roles: ['admin', 'guru_bk'] },
-    { name: 'Import Data Excel', href: '/import', icon: FileSpreadsheet, roles: ['admin', 'guru_bk'] },
-    { name: 'Surat Peringatan (SP)', href: '/surat', icon: FileText, roles: ['admin', 'guru_bk'] },
-    { name: 'Log Aktivitas', href: '/log', icon: History, roles: ['admin', 'guru_bk'] },
-    { name: 'Pengaturan Sistem', href: '/settings', icon: Settings, roles: ['admin'] }
-  ];
-
-  const filteredNav = navigation.filter(item => {
-    if (!item.roles) return true;
-    return user && item.roles.includes(user.role);
-  });
+  const filteredNav = navigation.filter(item => canAccess(item, user));
 
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-gray-200 z-30">
@@ -57,7 +33,7 @@ export default function Sidebar() {
             Menu Utama
           </div>
           {filteredNav.map((item) => {
-            const isActive = location === item.href || (item.href !== '/' && location.startsWith(item.href));
+            const isActive = isActivePath(location, item.href);
             const Icon = item.icon;
             return (
               <Link
