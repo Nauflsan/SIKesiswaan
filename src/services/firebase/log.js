@@ -23,18 +23,13 @@ export const firebaseLogService = {
    * Mengambil riwayat log aktivitas terbaru
    */
   getAll: async ({ limitCount = 100 } = {}) => {
-    try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch (err) {
-      console.warn('Gagal memuat log aktivitas:', err.message);
-      return [];
-    }
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   },
 
   /**
@@ -56,6 +51,7 @@ export const firebaseLogService = {
       await setDoc(doc(db, COLLECTION_NAME, id), entry);
       return entry;
     } catch (err) {
+      // Disengaja: kegagalan mencatat log tidak boleh membatalkan aksi utama
       console.warn('Gagal menulis log aktivitas:', err.message);
       return null;
     }

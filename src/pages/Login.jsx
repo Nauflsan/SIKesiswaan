@@ -6,13 +6,14 @@ import { ShieldAlert, LogIn, Cloud, AlertCircle } from 'lucide-preact';
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const { login } = useAuthStore();
+  const { login, sessionMessage } = useAuthStore();
   const { showToast } = useUIStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  // Menampilkan alasan sesi berakhir (mis. akun dinonaktifkan Administrator)
+  const [errorMessage, setErrorMessage] = useState(sessionMessage || '');
 
   const handleSubmit = async (e) => {
     e.preventDefault();

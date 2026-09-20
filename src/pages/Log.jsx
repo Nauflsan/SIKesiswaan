@@ -2,11 +2,13 @@ import { useState, useEffect } from 'preact/hooks';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { logService } from '../services/index.js';
 import { formatWaktu } from '../lib/helpers.js';
-import {  } from 'lucide-preact';
+import { friendlyError } from '../lib/errors.js';
+import LoadError from '../components/ui/LoadError.jsx';
 
 export default function Log() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
     loadLogs();
@@ -14,11 +16,12 @@ export default function Log() {
 
   async function loadLogs() {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await logService.getAll();
       setLogs(data);
     } catch (err) {
-      console.error(err);
+      setLoadError(friendlyError(err, 'Gagal memuat log aktivitas'));
     } finally {
       setLoading(false);
     }
@@ -71,7 +74,13 @@ export default function Log() {
               {logs.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="py-12 text-center text-gray-400">
-                    {loading ? 'Memuat log aktivitas...' : 'Belum ada log aktivitas tercatat.'}
+                    {loadError ? (
+                      <LoadError message={loadError} onRetry={loadLogs} />
+                    ) : loading ? (
+                      'Memuat log aktivitas...'
+                    ) : (
+                      'Belum ada log aktivitas tercatat.'
+                    )}
                   </td>
                 </tr>
               ) : (

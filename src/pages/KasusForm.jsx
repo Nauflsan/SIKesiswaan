@@ -25,6 +25,7 @@ import { useLocation } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { SPBadge } from '../components/ui/Badge.jsx';
 import { siswaService, kategoriService, kasusService, settingsService } from '../services/index.js';
+import { friendlyError } from '../lib/errors.js';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import { hitungStatusSP } from '../lib/helpers.js';
@@ -81,7 +82,7 @@ export default function KasusForm() {
         setSelectedSiswaId(preselectedSiswaId);
       }
     } catch (err) {
-      showToast('Gagal memuat data formulir', 'error');
+      showToast(friendlyError(err, 'Gagal memuat data formulir'), 'error');
     } finally {
       setLoading(false);
     }

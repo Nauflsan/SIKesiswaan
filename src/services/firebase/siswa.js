@@ -26,33 +26,28 @@ export const firebaseSiswaService = {
    * Mengambil daftar siswa dengan kriteria filter kelas, status SP, dan pencarian teks.
    */
   getAll: async ({ kelas, search, statusSP } = {}) => {
-    try {
-      const q = query(collection(db, COLLECTION_NAME), orderBy('nama', 'asc'));
-      const snap = await getDocs(q);
-      let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const q = query(collection(db, COLLECTION_NAME), orderBy('nama', 'asc'));
+    const snap = await getDocs(q);
+    let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // Filter: Hanya siswa yang belum di-soft delete
-      list = list.filter(s => s.isActive !== false && !s.deletedAt);
+    // Filter: Hanya siswa yang belum di-soft delete
+    list = list.filter(s => s.isActive !== false && !s.deletedAt);
 
-      if (kelas && kelas !== 'semua') {
-        list = list.filter(s => s.kelas === kelas);
-      }
-      if (statusSP && statusSP !== 'semua') {
-        list = list.filter(s => s.statusSP === statusSP);
-      }
-      if (search) {
-        const queryStr = search.toLowerCase();
-        list = list.filter(s =>
-          (s.nama && s.nama.toLowerCase().includes(queryStr)) ||
-          (s.nisn && s.nisn.includes(queryStr))
-        );
-      }
-
-      return list;
-    } catch (err) {
-      console.warn('Gagal memuat siswa dari Firestore:', err.message);
-      return [];
+    if (kelas && kelas !== 'semua') {
+      list = list.filter(s => s.kelas === kelas);
     }
+    if (statusSP && statusSP !== 'semua') {
+      list = list.filter(s => s.statusSP === statusSP);
+    }
+    if (search) {
+      const queryStr = search.toLowerCase();
+      list = list.filter(s =>
+        (s.nama && s.nama.toLowerCase().includes(queryStr)) ||
+        (s.nisn && s.nisn.includes(queryStr))
+      );
+    }
+
+    return list;
   },
 
   /**

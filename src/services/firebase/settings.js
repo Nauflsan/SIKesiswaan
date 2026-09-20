@@ -46,18 +46,19 @@ export const firebaseSettingsService = {
    * Mengambil konfigurasi profil sekolah dari dokumen singleton 'settings/global'
    */
   get: async () => {
-    try {
-      const snap = await getDoc(SETTINGS_DOC_REF);
-      if (snap.exists()) {
-        return { ...defaultSchoolSettings, ...snap.data() };
-      }
-      // Inisialisasi dokumen settings/global awal jika belum ada
-      await setDoc(SETTINGS_DOC_REF, defaultSchoolSettings);
-      return defaultSchoolSettings;
-    } catch (err) {
-      console.warn('Gagal membaca settings Firestore:', err.message);
-      return defaultSchoolSettings;
+    const snap = await getDoc(SETTINGS_DOC_REF);
+    if (snap.exists()) {
+      return { ...defaultSchoolSettings, ...snap.data() };
     }
+
+    // Dokumen belum ada: inisialisasi dengan nilai bawaan. Hanya Administrator yang berhak
+    // membuatnya, sehingga penolakan izin untuk Guru BK diabaikan.
+    try {
+      await setDoc(SETTINGS_DOC_REF, defaultSchoolSettings);
+    } catch (err) {
+      if (err?.code !== 'permission-denied') throw err;
+    }
+    return defaultSchoolSettings;
   },
 
   /**
@@ -85,26 +86,28 @@ export const firebaseSettingsService = {
     if (ambangChanged) {
       try {
         const siswaSnap = await getDocs(collection(db, 'siswa'));
-        const batch = writeBatch(db);
-        let batchCount = 0;
+        const nowIso = new Date().toISOString();
 
-        siswaSnap.docs.forEach(docSnap => {
+        // Firestore membatasi 500 operasi per batch: proses bertahap 400 dokumen
+        const changed = siswaSnap.docs.filter(docSnap => {
           const s = docSnap.data();
-          const newStatusSP = hitungStatusSP(s.totalPoin || 0, updatedSettings);
-          if (newStatusSP !== s.statusSP) {
-            batch.update(docSnap.ref, {
-              statusSP: newStatusSP,
-              updatedAt: new Date().toISOString()
-            });
-            batchCount++;
-          }
+          return hitungStatusSP(s.totalPoin || 0, updatedSettings) !== s.statusSP;
         });
 
-        if (batchCount > 0) {
+        for (let i = 0; i < changed.length; i += 400) {
+          const batch = writeBatch(db);
+          changed.slice(i, i + 400).forEach(docSnap => {
+            batch.update(docSnap.ref, {
+              statusSP: hitungStatusSP(docSnap.data().totalPoin || 0, updatedSettings),
+              updatedAt: nowIso
+            });
+          });
           await batch.commit();
         }
-      } catch (e) {
-        console.warn('Gagal rekalkulasi batch status SP siswa:', e.message);
+      } catch (err) {
+        throw new Error(
+          'Ambang batas tersimpan, tetapi pembaruan status SP siswa gagal. Simpan ulang untuk mencoba lagi.'
+        );
       }
     }
 

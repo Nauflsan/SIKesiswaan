@@ -25,14 +25,9 @@ export const firebaseKategoriService = {
    * Mengambil seluruh kategori pelanggaran (diurutkan berdasarkan urutan)
    */
   getAll: async () => {
-    try {
-      const q = query(collection(db, COLLECTION_NAME), orderBy('urutan', 'asc'));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    } catch (err) {
-      console.warn('Gagal memuat kategori dari Firestore:', err.message);
-      return [];
-    }
+    const q = query(collection(db, COLLECTION_NAME), orderBy('urutan', 'asc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   },
 
   /**

@@ -1,5 +1,8 @@
+import { useEffect } from 'preact/hooks';
 import { Route, Switch, Redirect } from 'wouter-preact';
 import { useAuthStore } from './stores/authStore.js';
+import AppLayout from './components/layout/AppLayout.jsx';
+import LoadError from './components/ui/LoadError.jsx';
 
 // Pages
 import Dashboard from './pages/Dashboard.jsx';
@@ -14,12 +17,56 @@ import Log from './pages/Log.jsx';
 import Settings from './pages/Settings.jsx';
 import Login from './pages/Login.jsx';
 
+function FullScreenMessage({ children }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#FAFAF8] text-center p-4">
+      {children}
+    </div>
+  );
+}
+
+function Forbidden() {
+  return (
+    <AppLayout title="Akses Ditolak" subtitle="Halaman ini hanya untuk Administrator">
+      <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Anda tidak memiliki akses ke halaman ini</h2>
+        <p className="text-sm text-gray-500">Hubungi Administrator jika Anda memerlukan akses.</p>
+      </div>
+    </AppLayout>
+  );
+}
+
 export default function App() {
-  const { user } = useAuthStore();
+  const { user, ready, sessionError, init } = useAuthStore();
+
+  // Periksa sesi Firebase sekali saat aplikasi dibuka
+  useEffect(() => {
+    init();
+  }, []);
+
+  if (!ready) {
+    return (
+      <FullScreenMessage>
+        <p className="text-sm text-gray-500">Memuat sesi...</p>
+      </FullScreenMessage>
+    );
+  }
+
+  if (sessionError) {
+    return (
+      <FullScreenMessage>
+        <LoadError message={sessionError} onRetry={init} />
+      </FullScreenMessage>
+    );
+  }
+
+  // Membungkus halaman yang dibatasi role tertentu
+  const only = (roles, Component) => (params) =>
+    roles.includes(user.role) ? <Component params={params} /> : <Forbidden />;
 
   return (
     <Switch>
-      <Route path="/login" component={Login} />
+      <Route path="/login">{user ? <Redirect to="/" /> : <Login />}</Route>
 
       {/* Protected Routes */}
       {!user ? (
@@ -37,13 +84,13 @@ export default function App() {
           <Route path="/import" component={ImportExcel} />
           <Route path="/surat" component={Surat} />
           <Route path="/log" component={Log} />
-          <Route path="/settings" component={Settings} />
+          <Route path="/settings">{only(['admin'], Settings)}</Route>
         </>
       )}
 
       {/* 404 Fallback */}
       <Route>
-        <div className="min-h-screen flex items-center justify-center bg-[#FAFAF8] text-center p-4">
+        <FullScreenMessage>
           <div>
             <h1 className="text-4xl font-extrabold text-gray-900 mb-2 font-heading">404</h1>
             <p className="text-sm text-gray-500 mb-4">Halaman tidak ditemukan.</p>
@@ -51,7 +98,7 @@ export default function App() {
               Kembali ke Beranda
             </a>
           </div>
-        </div>
+        </FullScreenMessage>
       </Route>
     </Switch>
   );

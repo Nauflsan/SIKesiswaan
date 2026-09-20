@@ -24,6 +24,8 @@ import AppLayout from '../components/layout/AppLayout.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { PoinBadge } from '../components/ui/Badge.jsx';
 import { kategoriService, settingsService } from '../services/index.js';
+import { friendlyError } from '../lib/errors.js';
+import LoadError from '../components/ui/LoadError.jsx';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import {
@@ -39,6 +41,7 @@ export default function Kategori() {
 
   const [kategoriList, setKategoriList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   // State pengaturan form ambang batas SP
   const [ambang, setAmbang] = useState({ sp1: 50, sp2: 80, sp3: 110 });
@@ -58,6 +61,7 @@ export default function Kategori() {
    */
   async function loadData() {
     setLoading(true);
+    setLoadError(null);
     try {
       const [kategoriData, settingsData] = await Promise.all([
         kategoriService.getAll(),
@@ -70,7 +74,9 @@ export default function Kategori() {
         sp3: settingsData.ambangSp3 || 110
       });
     } catch (err) {
-      showToast('Gagal memuat data kategori', 'error');
+      const msg = friendlyError(err, 'Gagal memuat data kategori');
+      setLoadError(msg);
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -186,7 +192,10 @@ export default function Kategori() {
             </div>
 
             <div className="divide-y divide-gray-100">
-              {loading && kategoriList.length === 0 && (
+              {loadError && kategoriList.length === 0 && (
+                <LoadError message={loadError} onRetry={loadData} />
+              )}
+              {loading && !loadError && kategoriList.length === 0 && (
                 <p className="py-8 text-center text-sm text-gray-400">Memuat kategori...</p>
               )}
               {kategoriList.map((item, idx) => (

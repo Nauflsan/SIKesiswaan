@@ -26,6 +26,8 @@ import AppLayout from '../components/layout/AppLayout.jsx';
 import { KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { kasusService, siswaService, kategoriService } from '../services/index.js';
+import { friendlyError } from '../lib/errors.js';
+import LoadError from '../components/ui/LoadError.jsx';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import { formatTanggal } from '../lib/helpers.js';
@@ -49,6 +51,7 @@ export default function Kasus() {
   const [kasusList, setKasusList] = useState([]);
   const [kategoriList, setKategoriList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   // State Filter
   const [search, setSearch] = useState('');
@@ -80,6 +83,7 @@ export default function Kasus() {
    */
   async function loadData() {
     setLoading(true);
+    setLoadError(null);
     try {
       const [kategoriData, data, siswaData] = await Promise.all([
         kategoriService.getAll(),
@@ -105,7 +109,9 @@ export default function Kasus() {
       ).sort();
       setDistinctKelas(uniqueClasses);
     } catch (err) {
-      showToast('Gagal memuat data kasus', 'error');
+      const msg = friendlyError(err, 'Gagal memuat data kasus');
+      setLoadError(msg);
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -263,13 +269,17 @@ export default function Kasus() {
               {kasusList.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="py-12 text-center text-gray-400">
-                    <div className="max-w-sm mx-auto space-y-2">
-                      <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto" />
-                      <p className="font-semibold text-gray-600">{loading ? 'Memuat data kasus...' : 'Tidak ada data kasus yang cocok'}</p>
-                      {!loading && (
-                        <p className="text-[11px]">Coba ubah kata kunci pencarian atau bersihkan filter di atas.</p>
-                      )}
-                    </div>
+                    {loadError ? (
+                      <LoadError message={loadError} onRetry={loadData} />
+                    ) : (
+                      <div className="max-w-sm mx-auto space-y-2">
+                        <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto" />
+                        <p className="font-semibold text-gray-600">{loading ? 'Memuat data kasus...' : 'Tidak ada data kasus yang cocok'}</p>
+                        {!loading && (
+                          <p className="text-[11px]">Coba ubah kata kunci pencarian atau bersihkan filter di atas.</p>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (

@@ -8,6 +8,7 @@
 
 import { auth, db } from '../../lib/firebase.js';
 import {
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
   createUserWithEmailAndPassword,
@@ -23,97 +24,162 @@ import {
   deleteDoc,
   collection,
   getDocs,
+  onSnapshot,
   query,
   orderBy,
   serverTimestamp
 } from 'firebase/firestore';
 import { firebaseLogService } from './log.js';
 
-const CACHE_USER_KEY = 'sks_firebase_user_cache';
-const CACHE_USERS_LIST_KEY = 'sks_firebase_users_list_cache';
+const VALID_ROLES = ['admin', 'guru_bk'];
+const LOGIN_TIMEOUT_MS = 15000;
 
-// Helper get cached user
-function getCachedUser() {
-  try {
-    const raw = localStorage.getItem(CACHE_USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
+// Berisi { resolve, reject } selama proses login berjalan; diselesaikan oleh listener sesi.
+let pendingLogin = null;
 
-// Helper set cached user
-function setCachedUser(user) {
-  try {
-    if (user) {
-      localStorage.setItem(CACHE_USER_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(CACHE_USER_KEY);
-    }
-  } catch {
-    // localStorage tidak tersedia (mode privat): cache dilewati
+/**
+ * Memvalidasi dokumen profil /users/{uid}. Mengembalikan { profile } atau { error }.
+ */
+function validateProfile(snap) {
+  if (!snap.exists()) {
+    return { error: 'Akun Anda belum terdaftar di sistem. Hubungi Administrator.' };
   }
-}
-
-// Helper cached users list
-function getCachedUsersList() {
-  try {
-    const raw = localStorage.getItem(CACHE_USERS_LIST_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+  const profile = { id: snap.id, ...snap.data() };
+  if (!VALID_ROLES.includes(profile.role)) {
+    return { error: 'Role akun tidak valid. Hubungi Administrator.' };
   }
-}
-
-function setCachedUsersList(list) {
-  try {
-    localStorage.setItem(CACHE_USERS_LIST_KEY, JSON.stringify(list || []));
-  } catch {
-    // localStorage tidak tersedia (mode privat): cache dilewati
+  if (profile.isActive !== true) {
+    return { error: 'Akses ditolak: Akun Anda tidak aktif. Hubungi Administrator.' };
   }
+  return { profile };
 }
 
 export const firebaseAuthService = {
   /**
-   * Mengambil data pengguna yang sedang aktif (dari cache lokal untuk respon instan)
+   * Memantau sesi login. Sumber kebenaran: sesi Firebase Auth + dokumen profil /users/{uid}
+   * (dipantau realtime, sehingga akun yang dinonaktifkan atau dihapus otomatis keluar).
+   * callback({ user, message, retryable }) dipanggil setiap status sesi berubah.
+   * Mengembalikan fungsi untuk berhenti memantau.
    */
-  getCurrentUser: () => {
-    return getCachedUser();
+  onSessionChange: (callback) => {
+    let unsubProfile = null;
+    let waitTimer = null;
+    const stopProfile = () => {
+      if (unsubProfile) {
+        unsubProfile();
+        unsubProfile = null;
+      }
+      if (waitTimer) {
+        clearTimeout(waitTimer);
+        waitTimer = null;
+      }
+    };
+
+    const unsubAuth = onAuthStateChanged(auth, (fbUser) => {
+      stopProfile();
+
+      if (!fbUser) {
+        callback({ user: null, message: null, retryable: false });
+        return;
+      }
+
+      // Bila profil tak kunjung terbaca (mis. offline), jangan biarkan layar menunggu selamanya
+      waitTimer = setTimeout(() => {
+        waitTimer = null;
+        if (!pendingLogin) {
+          callback({
+            user: null,
+            message: 'Gagal memuat profil akun. Periksa koneksi internet lalu coba lagi.',
+            retryable: true
+          });
+        }
+      }, LOGIN_TIMEOUT_MS);
+
+      unsubProfile = onSnapshot(
+        doc(db, 'users', fbUser.uid),
+        (snap) => {
+          // Saat offline, dokumen yang belum ada di cache dilaporkan "tidak ada": tunggu data server
+          if (!snap.exists() && snap.metadata.fromCache) return;
+
+          if (waitTimer) {
+            clearTimeout(waitTimer);
+            waitTimer = null;
+          }
+
+          const result = validateProfile(snap);
+          const pending = pendingLogin;
+          pendingLogin = null;
+
+          if (result.error) {
+            stopProfile();
+            signOut(auth).catch(() => {});
+            if (pending) pending.reject(new Error(result.error));
+            callback({ user: null, message: result.error, retryable: false });
+            return;
+          }
+
+          if (pending) pending.resolve(result.profile);
+          callback({ user: result.profile, message: null, retryable: false });
+        },
+        () => {
+          // Gagal membaca profil (umumnya jaringan). Saat login: batalkan sesi.
+          // Saat membuka ulang aplikasi: sesi dipertahankan dan pengguna diminta mencoba lagi.
+          const message = 'Gagal memuat profil akun. Periksa koneksi internet lalu coba lagi.';
+          const pending = pendingLogin;
+          pendingLogin = null;
+          if (pending) {
+            signOut(auth).catch(() => {});
+            pending.reject(new Error(message));
+          }
+          callback({ user: null, message, retryable: !pending });
+        }
+      );
+    });
+
+    return () => {
+      stopProfile();
+      unsubAuth();
+    };
   },
 
   /**
    * Mengambil daftar seluruh pengguna dari Firestore
    */
-  getAllUsers: () => {
-    return getCachedUsersList();
-  },
-
-  /**
-   * Refresh daftar pengguna dari Firestore secara asinkron
-   */
   fetchUsersList: async () => {
-    try {
-      const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-      const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setCachedUsersList(list);
-      return list;
-    } catch (err) {
-      console.warn('Gagal memuat users dari Firestore:', err.message);
-      return getCachedUsersList();
-    }
+    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   },
 
   /**
-   * Masuk ke sistem menggunakan Firebase Authentication
+   * Masuk ke sistem menggunakan Firebase Authentication.
+   * Profil pengguna diselesaikan oleh onSessionChange; fungsi ini menunggu hasilnya.
    */
   login: async (email, password) => {
-    // 1. Autentikasi dengan Firebase Auth
-    let cred;
+    if (pendingLogin) {
+      throw new Error('Proses masuk sedang berjalan. Mohon tunggu.');
+    }
+
+    const profilePromise = new Promise((resolve, reject) => {
+      pendingLogin = { resolve, reject };
+    });
+    profilePromise.catch(() => {}); // penolakan ditangani oleh pemanggil login()
+
+    const timer = setTimeout(() => {
+      if (pendingLogin) {
+        const pending = pendingLogin;
+        pendingLogin = null;
+        signOut(auth).catch(() => {});
+        pending.reject(new Error('Waktu memuat profil habis. Periksa koneksi internet lalu coba lagi.'));
+      }
+    }, LOGIN_TIMEOUT_MS);
+    profilePromise.then(() => clearTimeout(timer), () => clearTimeout(timer));
+
     try {
-      cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (err) {
-      console.warn('Firebase login error:', err.code, err.message);
+      pendingLogin = null;
+      clearTimeout(timer);
       if (
         err.code === 'auth/invalid-credential' ||
         err.code === 'auth/wrong-password' ||
@@ -127,64 +193,17 @@ export const firebaseAuthService = {
       } else if (err.code === 'auth/network-request-failed') {
         throw new Error('Gagal terhubung ke server. Periksa koneksi internet Anda.');
       }
-      throw new Error(err.message || 'Email atau kata sandi yang Anda masukkan salah.');
-    }
-    const fbUser = cred.user;
-
-    // 2. Ambil dokumen profil & role dari koleksi 'users' di Firestore.
-    //    Tidak ada pembuatan profil otomatis: akun harus didaftarkan Administrator
-    //    (admin pertama dibuat manual lewat Firebase Console).
-    const userDocRef = doc(db, 'users', fbUser.uid);
-    let userDocSnap;
-    try {
-      userDocSnap = await getDoc(userDocRef);
-    } catch (err) {
-      await signOut(auth);
-      setCachedUser(null);
-      throw new Error('Gagal memuat profil akun. Silakan coba lagi.');
+      throw new Error('Email atau kata sandi yang Anda masukkan salah.');
     }
 
-    if (!userDocSnap.exists()) {
-      await signOut(auth);
-      setCachedUser(null);
-      throw new Error('Akun Anda belum terdaftar di sistem. Hubungi Administrator.');
-    }
-
-    const profile = { id: fbUser.uid, ...userDocSnap.data() };
-
-    if (!['admin', 'guru_bk'].includes(profile.role)) {
-      await signOut(auth);
-      setCachedUser(null);
-      throw new Error('Role akun tidak valid. Hubungi Administrator.');
-    }
-
-    // 3. Validasi status aktif akun
-    if (profile.isActive === false) {
-      await signOut(auth);
-      setCachedUser(null);
-      throw new Error('Akses ditolak: Akun Anda telah dinonaktifkan oleh Administrator.');
-    }
-
-    // 4. Simpan ke cache lokal
-    setCachedUser(profile);
-
-    // Refresh daftar user di background
-    firebaseAuthService.fetchUsersList().catch(() => {});
-
-    return profile;
+    return profilePromise;
   },
 
   /**
    * Keluar dari sesi aplikasi
    */
   logout: async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.warn('Signout error:', err.message);
-    } finally {
-      setCachedUser(null);
-    }
+    await signOut(auth);
   },
 
   /**
@@ -252,11 +271,6 @@ export const firebaseAuthService = {
     // Keluar dari secondary app (sesi Admin di app utama tidak terpengaruh)
     await signOut(secondaryAuth);
 
-    // Perbarui cache lokal
-    const currentList = getCachedUsersList();
-    const updatedList = [newUserDoc, ...currentList.filter(u => u.id !== newUid)];
-    setCachedUsersList(updatedList);
-
     return newUserDoc;
   },
 
@@ -280,11 +294,7 @@ export const firebaseAuthService = {
       updatedAt: serverTimestamp()
     });
 
-    const updated = { id: userId, ...snap.data(), isActive: newStatus };
-    const list = getCachedUsersList().map(u => u.id === userId ? updated : u);
-    setCachedUsersList(list);
-
-    return updated;
+    return { id: userId, ...snap.data(), isActive: newStatus };
   },
 
   /**
@@ -303,10 +313,6 @@ export const firebaseAuthService = {
     const nama = snap.exists() ? snap.data().nama : userId;
 
     await deleteDoc(userDocRef);
-
-    // Hapus dari cache lokal
-    const list = getCachedUsersList().filter(u => u.id !== userId);
-    setCachedUsersList(list);
 
     // Catat log aktivitas
     await firebaseLogService.create({

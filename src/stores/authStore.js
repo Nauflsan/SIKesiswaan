@@ -2,36 +2,60 @@
  * ============================================================================
  * STATE MANAGEMENT: OTENTIKASI & PENGGUNA (src/stores/authStore.js)
  * ============================================================================
- * Menggunakan Zustand untuk mengelola state global sesi login, hak akses (RBAC),
- * dan daftar pengguna di seluruh halaman aplikasi.
+ * Menggunakan Zustand untuk mengelola sesi login dan hak akses (RBAC).
+ * Sumber kebenaran sesi adalah Firebase Auth + dokumen profil /users/{uid},
+ * bukan cache di browser. Panggil init() sekali saat aplikasi dibuka.
  */
 
 import { create } from 'zustand';
 import { authService } from '../services/index.js';
 
+// Fungsi untuk berhenti memantau sesi (diisi oleh init)
+let stopSession = null;
+
 export const useAuthStore = create((set, get) => ({
-  // State: data pengguna yang sedang aktif login
-  user: authService.getCurrentUser(),
+  // Pengguna yang sedang login (null jika belum/tidak login)
+  user: null,
 
-  // State: daftar seluruh pengguna terdaftar
-  usersList: authService.getAllUsers(),
+  // false selama sesi Firebase belum selesai diperiksa (layar tunggu)
+  ready: false,
 
-  // Status loading dan error penanganan login
-  loading: false,
-  error: null,
+  // Pesan bila sesi gagal dimuat karena jaringan (layar "Coba lagi")
+  sessionError: null,
+
+  // Alasan sesi berakhir (mis. akun dinonaktifkan), ditampilkan di halaman login
+  sessionMessage: null,
 
   /**
-   * Masuk ke sistem dengan email & password.
+   * Mulai memantau sesi. Aman dipanggil ulang (dipakai tombol "Coba lagi").
+   */
+  init: () => {
+    if (stopSession) stopSession();
+    set({ ready: false, sessionError: null });
+
+    stopSession = authService.onSessionChange(({ user, message, retryable }) => {
+      set((state) => ({
+        user,
+        ready: true,
+        sessionError: retryable ? message : null,
+        sessionMessage: user
+          ? null
+          : retryable
+            ? state.sessionMessage
+            : (message ?? state.sessionMessage)
+      }));
+    });
+  },
+
+  /**
+   * Masuk ke sistem dengan email & password. State user diisi oleh pemantau sesi.
    */
   login: async (email, password) => {
-    set({ loading: true, error: null });
+    set({ sessionMessage: null });
     try {
-      const user = await authService.login(email, password);
-      const list = await authService.fetchUsersList();
-      set({ user, usersList: list, loading: false });
-      return user;
+      return await authService.login(email, password);
     } catch (err) {
-      set({ error: err.message, loading: false });
+      set({ sessionMessage: null });
       throw err;
     }
   },
@@ -41,7 +65,7 @@ export const useAuthStore = create((set, get) => ({
    */
   logout: async () => {
     await authService.logout();
-    set({ user: null });
+    set({ user: null, sessionMessage: null });
   },
 
   /**
@@ -49,32 +73,20 @@ export const useAuthStore = create((set, get) => ({
    * Hanya berhasil jika pengguna yang sedang login memiliki role 'admin'.
    */
   createUser: async (userData) => {
-    const currentUser = get().user;
-    const newUser = await authService.createUser(userData, currentUser);
-    const list = await authService.fetchUsersList();
-    set({ usersList: list });
-    return newUser;
+    return authService.createUser(userData, get().user);
   },
 
   /**
    * LOGIKA ADMIN: Menonaktifkan atau mengaktifkan akun pengguna.
    */
   toggleUserActive: async (userId) => {
-    const currentUser = get().user;
-    const updated = await authService.toggleUserActive(userId, currentUser);
-    const list = await authService.fetchUsersList();
-    set({ usersList: list });
-    return updated;
+    return authService.toggleUserActive(userId, get().user);
   },
 
   /**
    * LOGIKA ADMIN: Menghapus akun pengguna dari database.
    */
   deleteUser: async (userId) => {
-    const currentUser = get().user;
-    await authService.deleteUser(userId, currentUser);
-    const list = await authService.fetchUsersList();
-    set({ usersList: list });
-    return true;
+    return authService.deleteUser(userId, get().user);
   }
 }));

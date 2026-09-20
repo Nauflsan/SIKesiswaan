@@ -25,6 +25,8 @@ import AppLayout from '../components/layout/AppLayout.jsx';
 import { SPBadge } from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { siswaService } from '../services/index.js';
+import { friendlyError } from '../lib/errors.js';
+import LoadError from '../components/ui/LoadError.jsx';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import {
@@ -42,6 +44,7 @@ export default function Siswa() {
   // State data siswa & filter
   const [siswaList, setSiswaList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState('');
   const [selectedKelas, setSelectedKelas] = useState('semua');
   const [selectedStatusSP, setSelectedStatusSP] = useState('semua');
@@ -67,6 +70,7 @@ export default function Siswa() {
 
   async function loadSiswa() {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await siswaService.getAll({
         kelas: selectedKelas !== 'semua' ? selectedKelas : undefined,
@@ -75,7 +79,9 @@ export default function Siswa() {
       });
       setSiswaList(data);
     } catch (err) {
-      showToast('Gagal memuat daftar siswa', 'error');
+      const msg = friendlyError(err, 'Gagal memuat daftar siswa');
+      setLoadError(msg);
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -193,10 +199,16 @@ export default function Siswa() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
         {siswaList.length === 0 ? (
           <div className="col-span-full py-16 text-center text-gray-400 bg-white rounded-2xl border border-gray-200">
-            <User className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-            <p className="font-semibold text-gray-700 text-sm">{loading ? 'Memuat data siswa...' : 'Tidak ada data siswa ditemukan'}</p>
-            {!loading && (
-              <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian atau filter.</p>
+            {loadError ? (
+              <LoadError message={loadError} onRetry={loadSiswa} />
+            ) : (
+              <>
+                <User className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                <p className="font-semibold text-gray-700 text-sm">{loading ? 'Memuat data siswa...' : 'Tidak ada data siswa ditemukan'}</p>
+                {!loading && (
+                  <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian atau filter.</p>
+                )}
+              </>
             )}
           </div>
         ) : (

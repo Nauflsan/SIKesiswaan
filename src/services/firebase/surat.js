@@ -28,23 +28,18 @@ export const firebaseSuratService = {
    * Mengambil seluruh arsip surat peringatan
    */
   getAll: async ({ siswaId, jenis } = {}) => {
-    try {
-      const q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'));
-      const snap = await getDocs(q);
-      let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      if (siswaId) {
-        list = list.filter(s => s.siswaId === siswaId);
-      }
-      if (jenis && jenis !== 'semua') {
-        list = list.filter(s => s.jenis === jenis);
-      }
-
-      return list;
-    } catch (err) {
-      console.warn('Gagal memuat surat dari Firestore:', err.message);
-      return [];
+    if (siswaId) {
+      list = list.filter(s => s.siswaId === siswaId);
     }
+    if (jenis && jenis !== 'semua') {
+      list = list.filter(s => s.jenis === jenis);
+    }
+
+    return list;
   },
 
   /**

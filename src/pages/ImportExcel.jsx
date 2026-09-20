@@ -26,6 +26,7 @@ import { useState, useEffect } from 'preact/hooks';
 import * as XLSX from 'xlsx';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { siswaService, kategoriService, kasusService } from '../services/index.js';
+import { friendlyError } from '../lib/errors.js';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import {
@@ -63,7 +64,7 @@ export default function ImportExcel() {
       setExistingSiswa(siswaData);
       setKategoriList(katData);
     } catch (err) {
-      console.error(err);
+      showToast(friendlyError(err, 'Gagal memuat data awal'), 'error');
     }
   }
 

@@ -26,6 +26,8 @@ import { useState, useEffect } from 'preact/hooks';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { suratService, siswaService, kasusService, settingsService } from '../services/index.js';
+import { friendlyError } from '../lib/errors.js';
+import LoadError from '../components/ui/LoadError.jsx';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import { formatTanggal } from '../lib/helpers.js';
@@ -44,6 +46,7 @@ export default function Surat() {
   const [siswaList, setSiswaList] = useState([]);
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   // State Modal Penerbitan Surat Baru
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -66,6 +69,7 @@ export default function Surat() {
    */
   async function loadData() {
     setLoading(true);
+    setLoadError(null);
     try {
       const [suratData, siswaData, settingsData] = await Promise.all([
         suratService.getAll(),
@@ -84,7 +88,9 @@ export default function Surat() {
         setShowCreateModal(true);
       }
     } catch (err) {
-      showToast('Gagal memuat arsip surat', 'error');
+      const msg = friendlyError(err, 'Gagal memuat arsip surat');
+      setLoadError(msg);
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -188,9 +194,13 @@ export default function Surat() {
               {suratList.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="py-12 text-center text-gray-400">
-                    {loading
-                      ? 'Memuat data surat...'
-                      : 'Belum ada surat peringatan yang dibuat. Klik tombol di atas untuk menerbitkan surat.'}
+                    {loadError ? (
+                      <LoadError message={loadError} onRetry={loadData} />
+                    ) : loading ? (
+                      'Memuat data surat...'
+                    ) : (
+                      'Belum ada surat peringatan yang dibuat. Klik tombol di atas untuk menerbitkan surat.'
+                    )}
                   </td>
                 </tr>
               ) : (

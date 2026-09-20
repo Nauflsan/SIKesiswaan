@@ -21,6 +21,7 @@ import { Link, useRoute } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { SPBadge, KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
 import { siswaService, kasusService, suratService, settingsService } from '../services/index.js';
+import { friendlyError } from '../lib/errors.js';
 import { useUIStore } from '../stores/uiStore.js';
 import { formatTanggal } from '../lib/helpers.js';
 import {
@@ -68,7 +69,7 @@ export default function SiswaDetail() {
       setSuratList(suratData);
       setSettings(settingsData);
     } catch (err) {
-      showToast('Gagal memuat profil siswa', 'error');
+      showToast(friendlyError(err, 'Gagal memuat profil siswa'), 'error');
     } finally {
       setLoading(false);
     }

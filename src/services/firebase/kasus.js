@@ -51,41 +51,36 @@ export const firebaseKasusService = {
    * Mengambil riwayat pelanggaran dengan filter lengkap
    */
   getAll: async ({ siswaId, kelas, kategoriId, status, search, includeDeleted = false } = {}) => {
-    try {
-      const q = query(collection(db, COLLECTION_NAME), orderBy('tanggal', 'desc'));
-      const snap = await getDocs(q);
-      let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const q = query(collection(db, COLLECTION_NAME), orderBy('tanggal', 'desc'));
+    const snap = await getDocs(q);
+    let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      if (!includeDeleted) {
-        list = list.filter(k => !k.deletedAt);
-      }
-      if (siswaId) {
-        list = list.filter(k => k.siswaId === siswaId);
-      }
-      if (kelas && kelas !== 'semua') {
-        list = list.filter(k => k.siswaKelas === kelas);
-      }
-      if (kategoriId && kategoriId !== 'semua') {
-        list = list.filter(k => k.kategoriId === kategoriId);
-      }
-      if (status && status !== 'semua') {
-        list = list.filter(k => k.status === status);
-      }
-      if (search) {
-        const queryStr = search.toLowerCase();
-        list = list.filter(k =>
-          (k.siswaNama && k.siswaNama.toLowerCase().includes(queryStr)) ||
-          (k.siswaNisn && k.siswaNisn.includes(queryStr)) ||
-          (k.kategoriNama && k.kategoriNama.toLowerCase().includes(queryStr)) ||
-          (k.deskripsi && k.deskripsi.toLowerCase().includes(queryStr))
-        );
-      }
-
-      return list;
-    } catch (err) {
-      console.warn('Gagal memuat kasus dari Firestore:', err.message);
-      return [];
+    if (!includeDeleted) {
+      list = list.filter(k => !k.deletedAt);
     }
+    if (siswaId) {
+      list = list.filter(k => k.siswaId === siswaId);
+    }
+    if (kelas && kelas !== 'semua') {
+      list = list.filter(k => k.siswaKelas === kelas);
+    }
+    if (kategoriId && kategoriId !== 'semua') {
+      list = list.filter(k => k.kategoriId === kategoriId);
+    }
+    if (status && status !== 'semua') {
+      list = list.filter(k => k.status === status);
+    }
+    if (search) {
+      const queryStr = search.toLowerCase();
+      list = list.filter(k =>
+        (k.siswaNama && k.siswaNama.toLowerCase().includes(queryStr)) ||
+        (k.siswaNisn && k.siswaNisn.includes(queryStr)) ||
+        (k.kategoriNama && k.kategoriNama.toLowerCase().includes(queryStr)) ||
+        (k.deskripsi && k.deskripsi.toLowerCase().includes(queryStr))
+      );
+    }
+
+    return list;
   },
 
   /**
@@ -247,31 +242,26 @@ export const firebaseKasusService = {
    * (tidak dipakai alur normal; berguna bila data poin pernah tidak sinkron).
    */
   recalculateSiswaPoints: async (siswaId) => {
-    try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('siswaId', '==', siswaId)
-      );
-      const snap = await getDocs(q);
-      const activeKasus = snap.docs
-        .map(d => d.data())
-        .filter(k => !k.deletedAt);
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('siswaId', '==', siswaId)
+    );
+    const snap = await getDocs(q);
+    const activeKasus = snap.docs
+      .map(d => d.data())
+      .filter(k => !k.deletedAt);
 
-      const totalPoin = activeKasus.reduce((sum, k) => sum + Number(k.poin || 0), 0);
-      const settings = await firebaseSettingsService.get();
-      const statusSP = hitungStatusSP(totalPoin, settings);
+    const totalPoin = activeKasus.reduce((sum, k) => sum + Number(k.poin || 0), 0);
+    const settings = await firebaseSettingsService.get();
+    const statusSP = hitungStatusSP(totalPoin, settings);
 
-      const siswaRef = doc(db, 'siswa', siswaId);
-      await updateDoc(siswaRef, {
-        totalPoin,
-        statusSP,
-        updatedAt: new Date().toISOString()
-      });
+    const siswaRef = doc(db, 'siswa', siswaId);
+    await updateDoc(siswaRef, {
+      totalPoin,
+      statusSP,
+      updatedAt: new Date().toISOString()
+    });
 
-      return { totalPoin, statusSP };
-    } catch (err) {
-      console.warn('Gagal rekalkulasi poin siswa:', err.message);
-      return null;
-    }
+    return { totalPoin, statusSP };
   }
 };

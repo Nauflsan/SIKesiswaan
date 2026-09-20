@@ -15,6 +15,8 @@ import AppLayout from '../components/layout/AppLayout.jsx';
 import { SPBadge, KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
 import { kasusService, siswaService, kategoriService } from '../services/index.js';
 import { formatTanggal } from '../lib/helpers.js';
+import { friendlyError } from '../lib/errors.js';
+import LoadError from '../components/ui/LoadError.jsx';
 import {
   AlertCircle,
   Clock,
@@ -42,6 +44,7 @@ export default function Dashboard() {
 
   // State: 5 kasus terakhir yang dicatat
   const [recentKasus, setRecentKasus] = useState([]);
+  const [loadError, setLoadError] = useState(null);
 
   // State: Data distribusi kategori pelanggaran untuk grafik batang
   const [kategoriStats, setKategoriStats] = useState([]);
@@ -56,6 +59,7 @@ export default function Dashboard() {
    */
   async function loadDashboardData() {
     setLoading(true);
+    setLoadError(null);
     try {
       // Ambil data kasus, siswa, dan kategori secara paralel
       const [allKasus, allSiswa, allKategori] = await Promise.all([
@@ -108,7 +112,7 @@ export default function Dashboard() {
 
       setKategoriStats(counts);
     } catch (err) {
-      console.error('Gagal memuat data dasbor:', err);
+      setLoadError(friendlyError(err, 'Gagal memuat data dashboard.'));
     } finally {
       setLoading(false);
     }
@@ -122,6 +126,12 @@ export default function Dashboard() {
       title="Dashboard Kesiswaan"
       subtitle="Ringkasan data ketertiban dan kedisiplinan siswa"
     >
+      {loadError && (
+        <div className="mb-6 bg-white rounded-2xl border border-red-200">
+          <LoadError message={loadError} onRetry={loadDashboardData} />
+        </div>
+      )}
+
       {/* Baris Tombol Aksi Cepat (Quick Actions) */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-2">
