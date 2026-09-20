@@ -1,0 +1,545 @@
+/**
+ * =============================================================================
+ * KOMPONEN: Surat (Penerbitan Surat Peringatan & Panggilan Resmi)
+ * =============================================================================
+ * Modul administratif sekolah untuk menerbitkan Surat Peringatan (SP1, SP2, SP3)
+ * atau Surat Panggilan Orang Tua sesuai format tata naskah dinas resmi.
+ *
+ * FITUR UTAMA & LOGIKA BISNIS:
+ * 1. Penomoran Surat Atomik Otomatis:
+ *    - Menggunakan atomic counter dari konfigurasi sekolah (`nomorSuratCounter`).
+ *    - Format baku dinas: [NO_URUT]/BK-DISP/[BULAN_ROMAWI]/[TAHUN]
+ *      Contoh: 001/BK-DISP/IX/2026.
+ * 2. Kop Surat & Tipografi Formal:
+ *    - Wajib menggunakan font serif baku instansi pendidikan: 'Times New Roman'.
+ *    - Header memuat identitas dinamis (Pemda, Dinas Pendidikan, Sekolah, Alamat, Telp, Email).
+ * 3. Seleksi Riwayat Pelanggaran:
+ *    - Pengguna dapat memilih daftar pelanggaran mana saja yang ingin dilampirkan
+ *      pada badan surat sebagai rujukan sanksi.
+ * 4. Cetak & Unduh PDF:
+ *    - Mendukung window.print() dengan CSS styling khusus @media print (A4).
+ * =============================================================================
+ */
+
+import { useState, useEffect } from 'preact/hooks';
+import { jsPDF } from 'jspdf';
+import AppLayout from '../components/layout/AppLayout.jsx';
+import Modal from '../components/ui/Modal.jsx';
+import { suratService, siswaService, kasusService, settingsService } from '../services/index.js';
+import { useAuthStore } from '../stores/authStore.js';
+import { useUIStore } from '../stores/uiStore.js';
+import { formatTanggal, formatWaktu } from '../lib/helpers.js';
+import {
+  FileText,
+  Printer,
+  Download,
+  Plus,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+  School
+} from 'lucide-preact';
+
+export default function Surat() {
+  const { user } = useAuthStore();
+  const { showToast } = useUIStore();
+
+  // State arsip surat, siswa, dan profil sekolah
+  const [suratList, setSuratList] = useState([]);
+  const [siswaList, setSiswaList] = useState([]);
+  const [settings, setSettings] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  // State Modal Penerbitan Surat Baru
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedSiswaId, setSelectedSiswaId] = useState('');
+  const [jenisSurat, setJenisSurat] = useState('sp1');
+  const [keteranganTambahan, setKeteranganTambahan] = useState('');
+  const [studentKasus, setStudentKasus] = useState([]);
+  const [selectedKasusIds, setSelectedKasusIds] = useState([]);
+  const [generating, setGenerating] = useState(false);
+
+  // State Pratinjau Lembar Surat Resmi untuk Cetak
+  const [previewSurat, setPreviewSurat] = useState(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  /**
+   * Mengambil data arsip surat, data siswa, dan setting kop surat sekolah
+   */
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [suratData, siswaData, settingsData] = await Promise.all([
+        suratService.getAll(),
+        siswaService.getAll(),
+        settingsService.get()
+      ]);
+      setSuratList(suratData);
+      setSiswaList(siswaData);
+      setSettings(settingsData);
+
+      // Cek apakah ada query param ?siswaId=... dari tombol "Buat Surat SP" di halaman lain
+      const params = new URLSearchParams(window.location.search);
+      const sId = params.get('siswaId');
+      if (sId) {
+        setSelectedSiswaId(sId);
+        setShowCreateModal(true);
+      }
+    } catch (err) {
+      showToast('Gagal memuat arsip surat', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Mengambil riwayat kasus siswa yang dipilih agar dapat dicantumkan pada surat
+   */
+  useEffect(() => {
+    if (!selectedSiswaId) {
+      setStudentKasus([]);
+      setSelectedKasusIds([]);
+      return;
+    }
+    kasusService.getAll({ siswaId: selectedSiswaId }).then(data => {
+      setStudentKasus(data);
+      setSelectedKasusIds(data.map(k => k.id)); // Secara default pilih semua kasus aktif
+    });
+  }, [selectedSiswaId]);
+
+  /**
+   * Handler penerbitan surat:
+   * Menyimpan arsip surat ke database dan menaikkan nomor surat atomik.
+   */
+  const handleCreateSurat = async (e) => {
+    e.preventDefault();
+    if (!selectedSiswaId) {
+      showToast('Silakan pilih siswa terlebih dahulu', 'error');
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const created = await suratService.create({
+        siswaId: selectedSiswaId,
+        jenis: jenisSurat,
+        kasusIds: selectedKasusIds,
+        keteranganTambahan,
+        status: 'draft'
+      }, user);
+
+      showToast(`Surat ${created.nomorSurat} berhasil dibuat!`, 'success');
+      setShowCreateModal(false);
+      loadData();
+      setPreviewSurat(created); // Langsung buka pratinjau surat
+    } catch (err) {
+      showToast(err.message || 'Gagal menerbitkan surat', 'error');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  /**
+   * Membuka dialog print browser untuk cetak langsung atau "Save as PDF"
+   */
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportPDF = () => {
+    if (!previewSurat) return;
+    try {
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const element = document.getElementById('printable-surat-content');
+      if (!element) return;
+
+      doc.html(element, {
+        callback: function (pdf) {
+          pdf.save(`Surat_${previewSurat.nomorSurat.replace(/[\/\\]/g, '_')}.pdf`);
+          showToast('Dokumen PDF berhasil diunduh', 'success');
+        },
+        x: 10,
+        y: 10,
+        width: 190,
+        windowWidth: 800
+      });
+    } catch (err) {
+      // Fallback to browser print as PDF
+      window.print();
+    }
+  };
+
+  const selectedSiswa = siswaList.find(s => s.id === selectedSiswaId);
+
+  return (
+    <AppLayout
+      title="Surat Peringatan & Panggilan Resmi"
+      subtitle="Penerbitan surat resmi kedisiplinan sekolah berstandar administratif"
+    >
+      {/* Top Bar */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div>
+          <span className="text-xs font-semibold text-gray-500">
+            Total {suratList.length} surat telah diterbitkan
+          </span>
+        </div>
+        <button
+          onClick={() => {
+            setSelectedSiswaId('');
+            setShowCreateModal(true);
+          }}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-semibold rounded-xl shadow-xs transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Buat Surat SP Baru</span>
+        </button>
+      </div>
+
+      {/* Letters List */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden mb-8">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider text-[11px] font-semibold">
+              <tr>
+                <th className="py-3 px-4">Nomor Surat</th>
+                <th className="py-3 px-4">Jenis Surat</th>
+                <th className="py-3 px-4">Nama Siswa</th>
+                <th className="py-3 px-4">Kelas</th>
+                <th className="py-3 px-4">Tanggal Diterbitkan</th>
+                <th className="py-3 px-4">Akumulasi Poin</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {suratList.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="py-12 text-center text-gray-400">
+                    Belum ada surat peringatan yang dibuat. Klik tombol di atas untuk menerbitkan surat.
+                  </td>
+                </tr>
+              ) : (
+                suratList.map((surat) => (
+                  <tr key={surat.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-gray-900">
+                      {surat.nomorSurat}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-amber-100 text-amber-900">
+                        {surat.jenis}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-gray-900">
+                      {surat.siswaNama}
+                    </td>
+                    <td className="py-3.5 px-4 text-gray-500">
+                      {surat.siswaKelas}
+                    </td>
+                    <td className="py-3.5 px-4 text-gray-500">
+                      {formatTanggal(surat.tanggalSurat)}
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-red-600">
+                      {surat.totalPoin} pt
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 capitalize">
+                        {surat.status}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        onClick={() => setPreviewSurat(surat)}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Pratinjau</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal Generate Surat */}
+      {showCreateModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setShowCreateModal(false)}
+          title="Penerbitan Surat Peringatan / Panggilan"
+          maxWidth="max-w-2xl"
+        >
+          <form onSubmit={handleCreateSurat} className="space-y-4 text-xs">
+            <div>
+              <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                Pilih Siswa Penerima Surat <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={selectedSiswaId}
+                onChange={(e) => setSelectedSiswaId(e.target.value)}
+                required
+                className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl"
+              >
+                <option value="">-- Pilih Siswa --</option>
+                {siswaList.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.nama} ({s.kelas} • {s.totalPoin} Poin • {s.statusSP.toUpperCase()})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                  Jenis Surat <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={jenisSurat}
+                  onChange={(e) => setJenisSurat(e.target.value)}
+                  className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl font-semibold"
+                >
+                  <option value="sp1">Surat Peringatan I (SP 1)</option>
+                  <option value="sp2">Surat Peringatan II (SP 2)</option>
+                  <option value="sp3">Surat Peringatan III (SP 3 / Terakhir)</option>
+                  <option value="panggilan_orang_tua">Surat Panggilan Orang Tua</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                  Nomor Surat Berikutnya
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={`Nomor Urut #${(settings.nomorSuratCounter || 0) + 1} (Auto-increment)`}
+                  className="w-full text-sm py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Select violations to include in letter */}
+            {studentKasus.length > 0 && (
+              <div>
+                <label className="block font-bold uppercase tracking-wider text-gray-600 mb-2">
+                  Daftar Pelanggaran yang Dicantumkan di Surat ({selectedKasusIds.length} terpilih)
+                </label>
+                <div className="max-h-40 overflow-y-auto space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  {studentKasus.map(k => (
+                    <label key={k.id} className="flex items-center gap-2 cursor-pointer py-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedKasusIds.includes(k.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedKasusIds([...selectedKasusIds, k.id]);
+                          } else {
+                            setSelectedKasusIds(selectedKasusIds.filter(id => id !== k.id));
+                          }
+                        }}
+                        className="rounded text-[#4A6FA5] focus:ring-[#4A6FA5]"
+                      />
+                      <span className="font-medium text-gray-800">{formatTanggal(k.tanggal)}</span>
+                      <span className="text-gray-500">— {k.kategoriNama}</span>
+                      <span className="font-bold text-rose-600 ml-auto">+{k.poin} pt</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                Instruksi Khusus / Jadwal Menghadap (Opsional)
+              </label>
+              <textarea
+                rows="2"
+                placeholder="Contoh: Orang tua / wali siswa diminta hadir ke ruang BK pada hari Senin, 21 September 2026 pukul 09.00 WIB."
+                value={keteranganTambahan}
+                onInput={(e) => setKeteranganTambahan(e.target.value)}
+                className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 font-semibold text-gray-600 hover:bg-gray-100 rounded-xl"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={generating}
+                className="px-5 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white font-bold rounded-xl shadow-xs disabled:opacity-50"
+              >
+                {generating ? 'Membuat...' : 'Terbitkan Surat Resmi'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Preview & Print Modal */}
+      {previewSurat && (
+        <Modal
+          isOpen={true}
+          onClose={() => setPreviewSurat(null)}
+          title={`Pratinjau Resmi: ${previewSurat.nomorSurat}`}
+          maxWidth="max-w-4xl"
+        >
+          <div className="space-y-4">
+            {/* Top action buttons */}
+            <div className="flex items-center justify-between no-print bg-gray-50 p-3 rounded-xl border border-gray-200">
+              <span className="text-xs text-gray-500 font-medium">
+                Kop resmi sekolah & tanda tangan kepala sekolah otomatis terpasang
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrint}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-900 hover:bg-black text-white rounded-lg text-xs font-semibold"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Cetak Langsung</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Official Letterhead Paper View */}
+            <div
+              id="printable-surat-content"
+              className="surat-resmi bg-white p-10 sm:p-14 border border-gray-400 rounded-lg shadow-sm text-black leading-relaxed"
+              style={{ fontFamily: "'Times New Roman', Times, Georgia, serif", minHeight: '700px' }}
+            >
+              {/* Kop Surat Resmi */}
+              <div className="text-center pb-3 mb-5 border-b-[3px] border-double border-black">
+                <h3 className="text-sm font-bold uppercase tracking-wider leading-tight">
+                  {settings.pemerintahDaerah || 'PEMERINTAH DAERAH PROVINSI BANTEN'}
+                </h3>
+                <h4 className="text-sm font-bold uppercase tracking-wider leading-tight">
+                  {settings.dinasPendidikan || 'DINAS PENDIDIKAN DAN KEBUDAYAAN'}
+                </h4>
+                <h1 className="text-xl sm:text-2xl font-black uppercase text-black tracking-wide my-1">
+                  {settings.namaSekolah || 'SMKS Kharisma Panongan'}
+                </h1>
+                <p className="text-[12px] text-black leading-tight">
+                  {settings.alamatSekolah || 'Jl. Raya Panongan No. 1, Kec. Panongan, Kab. Tangerang, Banten 15710'}
+                  {settings.teleponSekolah ? ` • Telp: ${settings.teleponSekolah}` : ''}
+                </p>
+                {(settings.websiteSekolah || settings.emailSekolah) && (
+                  <p className="text-[11px] text-black leading-tight italic">
+                    {settings.websiteSekolah ? `Laman: ${settings.websiteSekolah}` : ''}
+                    {settings.websiteSekolah && settings.emailSekolah ? ' • ' : ''}
+                    {settings.emailSekolah ? `Pos-el: ${settings.emailSekolah}` : ''}
+                  </p>
+                )}
+              </div>
+
+              {/* Header Surat: Nomor, Lampiran, Hal */}
+              <div className="flex justify-between items-start text-xs mb-6">
+                <table className="text-xs">
+                  <tbody>
+                    <tr><td className="w-20 py-0.5">Nomor</td><td>: {previewSurat.nomorSurat}</td></tr>
+                    <tr><td className="py-0.5">Lampiran</td><td>: -</td></tr>
+                    <tr><td className="py-0.5">Perihal</td><td>: <strong>
+                      {previewSurat.jenis === 'sp1'
+                        ? 'Surat Peringatan Pertama (SP 1)'
+                        : previewSurat.jenis === 'sp2'
+                        ? 'Surat Peringatan Kedua (SP 2)'
+                        : previewSurat.jenis === 'sp3'
+                        ? 'Surat Peringatan Ketiga / Terakhir (SP 3)'
+                        : 'Panggilan Orang Tua / Wali Siswa'}
+                    </strong></td></tr>
+                  </tbody>
+                </table>
+                <div className="text-right text-xs">
+                  <p>{settings.kotaSekolah || 'Kabupaten Tangerang'}, {formatTanggal(previewSurat.tanggalSurat)}</p>
+                </div>
+              </div>
+
+              {/* Penerima Surat */}
+              <div className="text-xs mb-5">
+                <p>Kepada Yth.</p>
+                <p className="font-bold">Bapak / Ibu Orang Tua / Wali dari Siswa:</p>
+                <table className="my-2 ml-4 text-xs">
+                  <tbody>
+                    <tr><td className="w-28 py-0.5 font-medium">Nama Siswa</td><td>: <strong>{previewSurat.siswaNama}</strong></td></tr>
+                    <tr><td className="py-0.5 font-medium">NISN</td><td>: {previewSurat.siswaNisn}</td></tr>
+                    <tr><td className="py-0.5 font-medium">Kelas</td><td>: {previewSurat.siswaKelas}</td></tr>
+                  </tbody>
+                </table>
+                <p>Di Tempat</p>
+              </div>
+
+              {/* Isi Surat Baku */}
+              <div className="text-xs space-y-3 leading-relaxed text-justify">
+                <p>
+                  Dengan hormat,
+                </p>
+                <p>
+                  Berdasarkan hasil pemantauan ketertiban dan kedisiplinan siswa di lingkungan sekolah, bersama surat ini pihak sekolah menyampaikan pemberitahuan resmi bahwa putra/putri Bapak/Ibu tercatat telah melakukan pelanggaran tata tertib sekolah dengan akumulasi mencapai <strong>{previewSurat.totalPoin} Poin Pelanggaran</strong>.
+                </p>
+
+                {previewSurat.keteranganTambahan ? (
+                  <div className="p-3 border border-black/80 my-2 bg-gray-50/40 text-xs">
+                    <p className="font-bold mb-1">Pemberitahuan Khusus / Jadwal Menghadap:</p>
+                    <p className="italic">{previewSurat.keteranganTambahan}</p>
+                  </div>
+                ) : (
+                  <p>
+                    Sehubungan dengan hal tersebut, kami mengharapkan kerja sama Bapak/Ibu untuk memberikan bimbingan dan pengawasan yang lebih intensif di lingkungan keluarga agar yang bersangkutan tidak mengulangi tindakan pelanggaran di kemudian hari.
+                  </p>
+                )}
+
+                <p>
+                  Demikian surat pemberitahuan peringatan ini kami sampaikan dengan sebenar-benarnya untuk menjadi perhatian bersama demi kelancaran proses pembinaan karakter dan masa depan putra/putri Bapak/Ibu di sekolah kami. Atas perhatian dan kerja samanya, kami ucapkan terima kasih.
+                </p>
+              </div>
+
+              {/* Tanda Tangan Resmi */}
+              <div className="grid grid-cols-2 gap-8 pt-10 mt-6 text-xs">
+                <div>
+                  <p>Mengetahui,</p>
+                  <p className="font-bold">Guru Bimbingan Konseling (BK)</p>
+                  <div className="h-20"></div>
+                  <p className="font-bold underline uppercase">{previewSurat.createdByNama || user?.nama || 'Guru Bimbingan Konseling'}</p>
+                  <p className="text-[11px]">NIP. {previewSurat.createdByNip || user?.nip || '-'}</p>
+                </div>
+
+                <div className="text-right">
+                  <p>{settings.kotaSekolah || 'Kabupaten Tangerang'}, {formatTanggal(previewSurat.tanggalSurat)}</p>
+                  <p className="font-bold">Kepala Sekolah,</p>
+                  <div className="h-20"></div>
+                  <p className="font-bold underline uppercase">{settings.namaKepsek || 'Drs. H. Mulyadi, M.M.'}</p>
+                  <p className="text-[11px]">NIP. {settings.nipKepsek || '19750812 200212 1 005'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 no-print">
+              <button
+                onClick={() => setPreviewSurat(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </AppLayout>
+  );
+}

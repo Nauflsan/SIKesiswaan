@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+
+  --color-primary: #4A6FA5;
+  --color-primary-hover: #3b5b88;
+  --color-primary-light: #EBF0F7;
+  --color-secondary: #D4A853;
+  --color-ink: #1A1D23;
+  --color-ink-muted: #6B7280;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F4F5F7;
+  --color-border: #E5E7EB;
+
+  --color-sp-normal: #059669;
+  --color-sp1: #D97706;
+  --color-sp2: #EA580C;
+  --color-sp3: #DC2626;
+}
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+/* Formal Official Letter Styles (Times New Roman) */
+.surat-resmi,
+.surat-resmi h1,
+.surat-resmi h2,
+.surat-resmi h3,
+.surat-resmi h4,
+.surat-resmi h5,
+.surat-resmi h6,
+.surat-resmi p,
+.surat-resmi span,
+.surat-resmi td,
+.surat-resmi th,
+.surat-resmi table,
+.surat-resmi div,
+.surat-resmi strong {
+  font-family: 'Times New Roman', Times, Georgia, serif !important;
+}
+
+/* Print utilities */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
