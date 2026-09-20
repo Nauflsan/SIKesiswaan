@@ -31,11 +31,8 @@ import { hitungStatusSP } from '../lib/helpers.js';
 import {
   Save,
   ArrowLeft,
-  UserCheck,
   AlertCircle,
-  Sparkles,
-  Calendar,
-  Tag
+  Sparkles
 } from 'lucide-preact';
 
 export default function KasusForm() {
@@ -269,7 +266,7 @@ export default function KasusForm() {
               </button>
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || loading}
                 className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-bold rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />

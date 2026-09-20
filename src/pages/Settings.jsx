@@ -3,7 +3,7 @@
  * KOMPONEN: Settings (Pengaturan Sistem & Profil Sekolah)
  * =============================================================================
  * Mengelola parameter administratif sekolah, identitas kop surat dinas,
- * manajemen akun pengguna (RBAC), dan pemeliharaan database.
+ * manajemen akun pengguna (RBAC), dan informasi status database.
  *
  * FITUR UTAMA & LOGIKA BISNIS:
  * 1. Profil & Kop Surat Dinamis:
@@ -13,9 +13,8 @@
  * 2. Manajemen Akun Pengguna (RBAC Ketat):
  *    - Hanya pengguna dengan peran 'admin' yang dapat menambah pengguna baru
  *      atau mengubah status aktif/nonaktif akun.
- * 3. Pemeliharaan & Reset Database:
- *    - Fitur satu klik untuk mereset seluruh database simulasi localStorage
- *      kembali ke data benih (seed) awal jika ingin mendemokan ulang dari nol.
+ * 3. Status Cloud Database:
+ *    - Informasi koneksi dan keamanan Firebase Firestore.
  * =============================================================================
  */
 
@@ -26,20 +25,14 @@ import { settingsService, authService } from "../services/index.js";
 import { useAuthStore } from "../stores/authStore.js";
 import { useUIStore } from "../stores/uiStore.js";
 import {
-  Settings as SettingsIcon,
   School,
-  FileText,
   Users,
   Cloud,
   Save,
-  CheckCircle2,
-  AlertTriangle,
   UserPlus,
   ShieldCheck,
   ShieldAlert,
-  UserX,
-  UserCheck,
-  Trash2,
+  Trash2
 } from "lucide-preact";
 
 export default function Settings() {
@@ -366,7 +359,7 @@ export default function Settings() {
                 </label>
                 <input
                   type="email"
-                  placeholder="info@smkn1sby.sch.id"
+                  placeholder="info@sekolah.sch.id"
                   value={settings.emailSekolah || ""}
                   onInput={(e) =>
                     setSettings({ ...settings, emailSekolah: e.target.value })
@@ -380,7 +373,7 @@ export default function Settings() {
                 </label>
                 <input
                   type="text"
-                  placeholder="www.smkn1sby.sch.id"
+                  placeholder="www.sekolah.sch.id"
                   value={settings.websiteSekolah || ""}
                   onInput={(e) =>
                     setSettings({ ...settings, websiteSekolah: e.target.value })

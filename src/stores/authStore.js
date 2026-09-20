@@ -21,15 +21,6 @@ export const useAuthStore = create((set, get) => ({
   error: null,
 
   /**
-   * Mengambil ulang daftar pengguna terbaru dari database.
-   */
-  refreshUsersList: async () => {
-    const list = await authService.fetchUsersList();
-    set({ usersList: list });
-    return list;
-  },
-
-  /**
    * Masuk ke sistem dengan email & password.
    */
   login: async (email, password) => {
@@ -85,19 +76,5 @@ export const useAuthStore = create((set, get) => ({
     const list = await authService.fetchUsersList();
     set({ usersList: list });
     return true;
-  },
-
-  /**
-   * FITUR PENGUJIAN / DEMO SIDANG:
-   * Mengganti peran pengguna secara instan dari Topbar untuk demonstrasi
-   * perspektif Admin atau Guru BK tanpa perlu login berulang kali.
-   */
-  switchUser: (userId) => {
-    const all = authService.getAllUsers();
-    const found = all.find(u => u.id === userId);
-    if (found) {
-      authService.setCurrentUser(found);
-      set({ user: found });
-    }
   }
 }));

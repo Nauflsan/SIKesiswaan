@@ -11,7 +11,6 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,
   collection,
   getDocs,
   writeBatch
@@ -21,17 +20,18 @@ import { hitungStatusSP } from '../../lib/helpers.js';
 const SETTINGS_DOC_REF = doc(db, 'settings', 'global');
 
 export const defaultSchoolSettings = {
-  pemerintahDaerah: 'PEMERINTAH DAERAH PROVINSI BANTEN',
-  dinasPendidikan: 'DINAS PENDIDIKAN DAN KEBUDAYAAN',
+  // Identitas sekolah dikosongkan: wajib diisi Administrator lewat menu Pengaturan
+  pemerintahDaerah: '',
+  dinasPendidikan: '',
   namaSekolah: 'SMKS Kharisma Panongan',
-  alamatSekolah: 'Jl. Raya Panongan No. 1, Kec. Panongan, Kab. Tangerang, Banten 15710',
-  kotaSekolah: 'Kabupaten Tangerang',
-  teleponSekolah: '(021) 59401234',
-  emailSekolah: 'info@smkskharismapanongan.sch.id',
-  websiteSekolah: 'https://smkskharismapanongan.sch.id',
-  namaKepsek: 'Drs. H. Mulyadi, M.M.',
-  nipKepsek: '19750812 200212 1 005',
-  logoUrl: 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=120&auto=format&fit=crop&q=60',
+  alamatSekolah: '',
+  kotaSekolah: '',
+  teleponSekolah: '',
+  emailSekolah: '',
+  websiteSekolah: '',
+  namaKepsek: '',
+  nipKepsek: '',
+  // Parameter sistem
   ambangSp1: 50,
   ambangSp2: 80,
   ambangSp3: 110,

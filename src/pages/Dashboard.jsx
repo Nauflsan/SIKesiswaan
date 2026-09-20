@@ -19,8 +19,6 @@ import {
   AlertCircle,
   Clock,
   Flame,
-  ShieldAlert,
-  UserCheck,
   PlusCircle,
   FileText,
   TrendingUp,
@@ -217,7 +215,7 @@ export default function Dashboard() {
 
           <div className="space-y-4">
             {kategoriStats.length === 0 ? (
-              <p className="text-sm text-gray-400 py-8 text-center">Belum ada data pelanggaran</p>
+              <p className="text-sm text-gray-400 py-8 text-center">{loading ? 'Memuat data...' : 'Belum ada data pelanggaran'}</p>
             ) : (
               kategoriStats.map((item, idx) => {
                 // Hitung persentase panjang batang relatif terhadap nilai tertinggi
@@ -258,7 +256,7 @@ export default function Dashboard() {
 
           <div className="divide-y divide-gray-100">
             {topSiswa.length === 0 ? (
-              <p className="text-sm text-gray-400 py-8 text-center">Tidak ada siswa berpoin</p>
+              <p className="text-sm text-gray-400 py-8 text-center">{loading ? 'Memuat data...' : 'Tidak ada siswa berpoin'}</p>
             ) : (
               topSiswa.map((siswa, idx) => (
                 <Link

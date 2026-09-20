@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'preact/hooks';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { logService } from '../services/index.js';
-import { formatTanggal, formatWaktu } from '../lib/helpers.js';
-import { History, ShieldCheck, UserCheck, Tag, FileText, Trash2, Edit3, PlusCircle } from 'lucide-preact';
+import { formatWaktu } from '../lib/helpers.js';
+import {  } from 'lucide-preact';
 
 export default function Log() {
   const [logs, setLogs] = useState([]);
@@ -71,7 +71,7 @@ export default function Log() {
               {logs.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="py-12 text-center text-gray-400">
-                    Belum ada log aktivitas tercatat.
+                    {loading ? 'Memuat log aktivitas...' : 'Belum ada log aktivitas tercatat.'}
                   </td>
                 </tr>
               ) : (

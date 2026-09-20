@@ -29,12 +29,9 @@ import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import {
   Search,
-  Plus,
   UserPlus,
   ArrowRight,
   Filter,
-  GraduationCap,
-  AlertTriangle,
   User
 } from 'lucide-preact';
 
@@ -197,8 +194,10 @@ export default function Siswa() {
         {siswaList.length === 0 ? (
           <div className="col-span-full py-16 text-center text-gray-400 bg-white rounded-2xl border border-gray-200">
             <User className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-            <p className="font-semibold text-gray-700 text-sm">Tidak ada data siswa ditemukan</p>
-            <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian atau filter.</p>
+            <p className="font-semibold text-gray-700 text-sm">{loading ? 'Memuat data siswa...' : 'Tidak ada data siswa ditemukan'}</p>
+            {!loading && (
+              <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian atau filter.</p>
+            )}
           </div>
         ) : (
           siswaList.map((siswa) => (

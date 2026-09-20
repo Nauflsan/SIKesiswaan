@@ -16,29 +16,23 @@
  * 3. Seleksi Riwayat Pelanggaran:
  *    - Pengguna dapat memilih daftar pelanggaran mana saja yang ingin dilampirkan
  *      pada badan surat sebagai rujukan sanksi.
- * 4. Cetak & Unduh PDF:
- *    - Mendukung window.print() dengan CSS styling khusus @media print (A4).
+ * 4. Cetak / Simpan PDF:
+ *    - Memakai window.print() dengan CSS khusus @media print (A4);
+ *      pilih "Save as PDF" pada dialog cetak untuk mengunduh PDF.
  * =============================================================================
  */
 
 import { useState, useEffect } from 'preact/hooks';
-import { jsPDF } from 'jspdf';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { suratService, siswaService, kasusService, settingsService } from '../services/index.js';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
-import { formatTanggal, formatWaktu } from '../lib/helpers.js';
+import { formatTanggal } from '../lib/helpers.js';
 import {
-  FileText,
   Printer,
-  Download,
   Plus,
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  Eye,
-  School
+  Eye
 } from 'lucide-preact';
 
 export default function Surat() {
@@ -150,36 +144,6 @@ export default function Surat() {
     window.print();
   };
 
-  const handleExportPDF = () => {
-    if (!previewSurat) return;
-    try {
-      const doc = new jsPDF({
-        orientation: 'p',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const element = document.getElementById('printable-surat-content');
-      if (!element) return;
-
-      doc.html(element, {
-        callback: function (pdf) {
-          pdf.save(`Surat_${previewSurat.nomorSurat.replace(/[\/\\]/g, '_')}.pdf`);
-          showToast('Dokumen PDF berhasil diunduh', 'success');
-        },
-        x: 10,
-        y: 10,
-        width: 190,
-        windowWidth: 800
-      });
-    } catch (err) {
-      // Fallback to browser print as PDF
-      window.print();
-    }
-  };
-
-  const selectedSiswa = siswaList.find(s => s.id === selectedSiswaId);
-
   return (
     <AppLayout
       title="Surat Peringatan & Panggilan Resmi"
@@ -224,7 +188,9 @@ export default function Surat() {
               {suratList.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="py-12 text-center text-gray-400">
-                    Belum ada surat peringatan yang dibuat. Klik tombol di atas untuk menerbitkan surat.
+                    {loading
+                      ? 'Memuat data surat...'
+                      : 'Belum ada surat peringatan yang dibuat. Klik tombol di atas untuk menerbitkan surat.'}
                   </td>
                 </tr>
               ) : (
@@ -426,17 +392,21 @@ export default function Surat() {
             >
               {/* Kop Surat Resmi */}
               <div className="text-center pb-3 mb-5 border-b-[3px] border-double border-black">
-                <h3 className="text-sm font-bold uppercase tracking-wider leading-tight">
-                  {settings.pemerintahDaerah || 'PEMERINTAH DAERAH PROVINSI BANTEN'}
-                </h3>
-                <h4 className="text-sm font-bold uppercase tracking-wider leading-tight">
-                  {settings.dinasPendidikan || 'DINAS PENDIDIKAN DAN KEBUDAYAAN'}
-                </h4>
+                {settings.pemerintahDaerah && (
+                  <h3 className="text-sm font-bold uppercase tracking-wider leading-tight">
+                    {settings.pemerintahDaerah}
+                  </h3>
+                )}
+                {settings.dinasPendidikan && (
+                  <h4 className="text-sm font-bold uppercase tracking-wider leading-tight">
+                    {settings.dinasPendidikan}
+                  </h4>
+                )}
                 <h1 className="text-xl sm:text-2xl font-black uppercase text-black tracking-wide my-1">
                   {settings.namaSekolah || 'SMKS Kharisma Panongan'}
                 </h1>
                 <p className="text-[12px] text-black leading-tight">
-                  {settings.alamatSekolah || 'Jl. Raya Panongan No. 1, Kec. Panongan, Kab. Tangerang, Banten 15710'}
+                  {settings.alamatSekolah || '(Alamat sekolah belum diisi di Pengaturan)'}
                   {settings.teleponSekolah ? ` • Telp: ${settings.teleponSekolah}` : ''}
                 </p>
                 {(settings.websiteSekolah || settings.emailSekolah) && (
@@ -466,7 +436,7 @@ export default function Surat() {
                   </tbody>
                 </table>
                 <div className="text-right text-xs">
-                  <p>{settings.kotaSekolah || 'Kabupaten Tangerang'}, {formatTanggal(previewSurat.tanggalSurat)}</p>
+                  <p>{settings.kotaSekolah || '(Kota)'}, {formatTanggal(previewSurat.tanggalSurat)}</p>
                 </div>
               </div>
 
@@ -520,11 +490,11 @@ export default function Surat() {
                 </div>
 
                 <div className="text-right">
-                  <p>{settings.kotaSekolah || 'Kabupaten Tangerang'}, {formatTanggal(previewSurat.tanggalSurat)}</p>
+                  <p>{settings.kotaSekolah || '(Kota)'}, {formatTanggal(previewSurat.tanggalSurat)}</p>
                   <p className="font-bold">Kepala Sekolah,</p>
                   <div className="h-20"></div>
-                  <p className="font-bold underline uppercase">{settings.namaKepsek || 'Drs. H. Mulyadi, M.M.'}</p>
-                  <p className="text-[11px]">NIP. {settings.nipKepsek || '19750812 200212 1 005'}</p>
+                  <p className="font-bold underline uppercase">{settings.namaKepsek || '(Nama Kepala Sekolah belum diisi)'}</p>
+                  <p className="text-[11px]">NIP. {settings.nipKepsek || '-'}</p>
                 </div>
               </div>
             </div>

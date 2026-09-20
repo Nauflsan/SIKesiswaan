@@ -30,12 +30,7 @@ import {
   Plus,
   Edit2,
   Trash2,
-  Tag,
-  Sliders,
-  CheckCircle2,
-  AlertTriangle,
-  MoveUp,
-  MoveDown
+  Sliders
 } from 'lucide-preact';
 
 export default function Kategori() {
@@ -43,7 +38,6 @@ export default function Kategori() {
   const { showToast } = useUIStore();
 
   const [kategoriList, setKategoriList] = useState([]);
-  const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
 
   // State pengaturan form ambang batas SP
@@ -70,7 +64,6 @@ export default function Kategori() {
         settingsService.get()
       ]);
       setKategoriList(kategoriData);
-      setSettings(settingsData);
       setAmbang({
         sp1: settingsData.ambangSp1 || 50,
         sp2: settingsData.ambangSp2 || 80,
@@ -193,6 +186,9 @@ export default function Kategori() {
             </div>
 
             <div className="divide-y divide-gray-100">
+              {loading && kategoriList.length === 0 && (
+                <p className="py-8 text-center text-sm text-gray-400">Memuat kategori...</p>
+              )}
               {kategoriList.map((item, idx) => (
                 <div
                   key={item.id}

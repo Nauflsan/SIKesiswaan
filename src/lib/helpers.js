@@ -140,33 +140,3 @@ export function formatRomawi(bulanNumber) {
   const idx = Math.max(1, Math.min(12, Number(bulanNumber) || 1)) - 1;
   return ROMAWI_BULAN[idx] || 'I';
 }
-
-/**
- * LOGIKA KEDINASAN: Membentuk nomor surat resmi sekolah sesuai standar tata naskah dinas.
- * Format standar: [NomorUrut]/[JenisSurat]/[KodeSekolah]/[BulanRomawi]/[Tahun]
- * Contoh output: "005/SP-1/SMKN1/IX/2026"
- * 
- * @param {number} counter - Nomor urut transaksi surat yang berjalan (auto-increment)
- * @param {string} jenis - Jenis surat ('sp1', 'sp2', 'sp3', 'panggilan_orang_tua')
- * @param {string} kodeSekolah - Singkatan kode sekolah dari settings (misal: "SMKN1")
- * @returns {string} String nomor surat dinas lengkap
- */
-export function generateNomorSuratString(counter, jenis, kodeSekolah) {
-  const now = new Date();
-  
-  // Format nomor urut 3 digit (misal 1 menjadi "001", 12 menjadi "012")
-  const nomor = String(counter).padStart(3, '0');
-  
-  // Ubah jenis surat menjadi kode kapital (misal "sp1" -> "SP-1")
-  const kodeJenis = jenis.toUpperCase().replace('_', '-');
-  
-  // Ambil bulan berjalan dalam format romawi (0 = Jan = I, 8 = Sep = IX)
-  const bulan = ROMAWI_BULAN[now.getMonth()];
-  
-  // Ambil tahun 4 digit
-  const tahun = now.getFullYear();
-  
-  const kode = kodeSekolah || 'SMK';
-
-  return `${nomor}/${kodeJenis}/${kode}/${bulan}/${tahun}`;
-}

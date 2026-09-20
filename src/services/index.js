@@ -26,6 +26,3 @@ export const suratService = firebaseSuratService;
 export const settingsService = firebaseSettingsService;
 export const logService = firebaseLogService;
 
-// Mode Cloud Firebase Aktif
-export const isMockMode = false;
-

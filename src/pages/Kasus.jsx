@@ -37,9 +37,6 @@ import {
   Trash2,
   FileText,
   RotateCcw,
-  CheckSquare,
-  Square,
-  Download,
   AlertTriangle
 } from 'lucide-preact';
 
@@ -268,8 +265,10 @@ export default function Kasus() {
                   <td colSpan="7" className="py-12 text-center text-gray-400">
                     <div className="max-w-sm mx-auto space-y-2">
                       <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto" />
-                      <p className="font-semibold text-gray-600">Tidak ada data kasus yang cocok</p>
-                      <p className="text-[11px]">Coba ubah kata kunci pencarian atau bersihkan filter di atas.</p>
+                      <p className="font-semibold text-gray-600">{loading ? 'Memuat data kasus...' : 'Tidak ada data kasus yang cocok'}</p>
+                      {!loading && (
+                        <p className="text-[11px]">Coba ubah kata kunci pencarian atau bersihkan filter di atas.</p>
+                      )}
                     </div>
                   </td>
                 </tr>

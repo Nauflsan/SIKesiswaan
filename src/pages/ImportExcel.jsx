@@ -30,12 +30,7 @@ import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import {
   UploadCloud,
-  FileSpreadsheet,
   Download,
-  CheckCircle2,
-  AlertCircle,
-  AlertTriangle,
-  ArrowRight,
   FileCheck
 } from 'lucide-preact';
 
@@ -292,7 +287,7 @@ export default function ImportExcel() {
             />
             <UploadCloud className="w-12 h-12 text-gray-400 mb-2" />
             <span className="text-sm font-bold text-gray-700 block">
-              {file ? file.name : 'Klik untuk memilih file Excel'}
+              {parsing ? 'Membaca file...' : file ? file.name : 'Klik untuk memilih file Excel'}
             </span>
             <span className="text-xs text-gray-400 mt-1 block">
               {file ? `${(file.size / 1024).toFixed(1)} KB` : 'Atau seret dan lepas file ke area ini'}

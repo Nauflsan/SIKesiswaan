@@ -212,34 +212,5 @@ export const firebaseSiswaService = {
     });
 
     return { success: true, imported, updated };
-  },
-
-  /**
-   * Seeding data master siswa awal SMKS Kharisma Panongan
-   */
-  seedInitial: async () => {
-    const initialSiswa = [
-      { id: 's1', nisn: '0089123401', nama: 'Dimas Aditya Pratama', kelas: 'XI TKJ 1', jurusan: 'Teknik Komputer dan Jaringan', angkatan: 2024, totalPoin: 0, statusSP: 'normal', isActive: true, deletedAt: null },
-      { id: 's2', nisn: '0089123402', nama: 'Fajar Ramadhan', kelas: 'X TKR 1', jurusan: 'Teknik Kendaraan Ringan', angkatan: 2025, totalPoin: 0, statusSP: 'normal', isActive: true, deletedAt: null },
-      { id: 's3', nisn: '0089123403', nama: 'Rizky Wahyu Nugroho', kelas: 'XII TKR 1', jurusan: 'Teknik Kendaraan Ringan', angkatan: 2023, totalPoin: 0, statusSP: 'normal', isActive: true, deletedAt: null },
-      { id: 's4', nisn: '0089123404', nama: 'Aldi Bagus Setiawan', kelas: 'XI TKJ 1', jurusan: 'Teknik Komputer dan Jaringan', angkatan: 2024, totalPoin: 0, statusSP: 'normal', isActive: true, deletedAt: null },
-      { id: 's5', nisn: '0089123405', nama: 'Bayu Arya Mahendra', kelas: 'X TKR 1', jurusan: 'Teknik Kendaraan Ringan', angkatan: 2025, totalPoin: 0, statusSP: 'normal', isActive: true, deletedAt: null },
-      { id: 's6', nisn: '0089123406', nama: 'Doni Saputra', kelas: 'XII TKJ 1', jurusan: 'Teknik Komputer dan Jaringan', angkatan: 2023, totalPoin: 0, statusSP: 'normal', isActive: true, deletedAt: null },
-      { id: 's7', nisn: '0089123407', nama: 'Galang Rambu Anarki', kelas: 'XI TKR 1', jurusan: 'Teknik Kendaraan Ringan', angkatan: 2024, totalPoin: 0, statusSP: 'normal', isActive: true, deletedAt: null },
-      { id: 's8', nisn: '0089123408', nama: 'Hendra Gunawan', kelas: 'XII TKR 1', jurusan: 'Teknik Kendaraan Ringan', angkatan: 2023, totalPoin: 0, statusSP: 'normal', isActive: true, deletedAt: null }
-    ];
-
-    const batch = writeBatch(db);
-    initialSiswa.forEach(s => {
-      const ref = doc(db, COLLECTION_NAME, s.id);
-      batch.set(ref, {
-        ...s,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-    });
-
-    await batch.commit();
-    return initialSiswa;
   }
 };

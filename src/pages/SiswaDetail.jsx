@@ -21,21 +21,14 @@ import { Link, useRoute } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { SPBadge, KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
 import { siswaService, kasusService, suratService, settingsService } from '../services/index.js';
-import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import { formatTanggal } from '../lib/helpers.js';
 import {
   ArrowLeft,
   FileText,
   PlusCircle,
-  Clock,
-  History,
   AlertTriangle,
-  GraduationCap,
-  Calendar,
-  Sparkles,
-  ShieldCheck,
-  CheckCircle2
+  GraduationCap
 } from 'lucide-preact';
 
 export default function SiswaDetail() {
@@ -43,7 +36,6 @@ export default function SiswaDetail() {
   const [, params] = useRoute('/siswa/:id');
   const siswaId = params?.id;
 
-  const { user } = useAuthStore();
   const { showToast } = useUIStore();
 
   // State profil siswa, daftar kasus, surat terbitan, dan konfigurasi ambang batas

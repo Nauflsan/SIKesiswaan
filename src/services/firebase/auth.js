@@ -10,7 +10,6 @@ import { auth, db } from '../../lib/firebase.js';
 import {
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
   createUserWithEmailAndPassword,
   deleteUser as deleteAuthUser,
   getAuth
@@ -51,7 +50,9 @@ function setCachedUser(user) {
     } else {
       localStorage.removeItem(CACHE_USER_KEY);
     }
-  } catch {}
+  } catch {
+    // localStorage tidak tersedia (mode privat): cache dilewati
+  }
 }
 
 // Helper cached users list
@@ -67,7 +68,9 @@ function getCachedUsersList() {
 function setCachedUsersList(list) {
   try {
     localStorage.setItem(CACHE_USERS_LIST_KEY, JSON.stringify(list || []));
-  } catch {}
+  } catch {
+    // localStorage tidak tersedia (mode privat): cache dilewati
+  }
 }
 
 export const firebaseAuthService = {
@@ -316,12 +319,5 @@ export const firebaseAuthService = {
     });
 
     return true;
-  },
-
-  /**
-   * Simulasi ganti role lokal (untuk keperluan demonstrasi sidang)
-   */
-  setCurrentUser: (user) => {
-    setCachedUser(user);
   }
 };
