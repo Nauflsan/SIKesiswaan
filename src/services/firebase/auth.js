@@ -12,6 +12,7 @@ import {
   signOut,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
+  deleteUser as deleteAuthUser,
   getAuth
 } from 'firebase/auth';
 import { initializeApp, getApps } from 'firebase/app';
@@ -127,25 +128,31 @@ export const firebaseAuthService = {
     }
     const fbUser = cred.user;
 
-    // 2. Ambil dokumen profil & role dari koleksi 'users' di Firestore
+    // 2. Ambil dokumen profil & role dari koleksi 'users' di Firestore.
+    //    Tidak ada pembuatan profil otomatis: akun harus didaftarkan Administrator
+    //    (admin pertama dibuat manual lewat Firebase Console).
     const userDocRef = doc(db, 'users', fbUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
+    let userDocSnap;
+    try {
+      userDocSnap = await getDoc(userDocRef);
+    } catch (err) {
+      await signOut(auth);
+      setCachedUser(null);
+      throw new Error('Gagal memuat profil akun. Silakan coba lagi.');
+    }
 
-    let profile;
-    if (userDocSnap.exists()) {
-      profile = { id: fbUser.uid, ...userDocSnap.data() };
-    } else {
-      // Auto-inisisalisasi jika akun pertama kali login dari Firebase Auth Console
-      profile = {
-        id: fbUser.uid,
-        uid: fbUser.uid,
-        nama: fbUser.displayName || email.split('@')[0].toUpperCase(),
-        email: fbUser.email,
-        role: 'admin', // Akun pertama yang dibuat di Firebase otomatis didaftarkan sebagai Admin
-        isActive: true,
-        createdAt: new Date().toISOString()
-      };
-      await setDoc(userDocRef, profile);
+    if (!userDocSnap.exists()) {
+      await signOut(auth);
+      setCachedUser(null);
+      throw new Error('Akun Anda belum terdaftar di sistem. Hubungi Administrator.');
+    }
+
+    const profile = { id: fbUser.uid, ...userDocSnap.data() };
+
+    if (!['admin', 'guru_bk'].includes(profile.role)) {
+      await signOut(auth);
+      setCachedUser(null);
+      throw new Error('Role akun tidak valid. Hubungi Administrator.');
     }
 
     // 3. Validasi status aktif akun
@@ -191,7 +198,10 @@ export const firebaseAuthService = {
     }
 
     const email = userData.email.trim();
-    const tempPassword = userData.password || 'password123';
+    const tempPassword = userData.password || '';
+    if (tempPassword.length < 6) {
+      throw new Error('Kata sandi awal wajib diisi (minimal 6 karakter).');
+    }
 
     // Inisialisasi app sekunder terisolasi
     const existingApps = getApps();
@@ -215,9 +225,6 @@ export const firebaseAuthService = {
     const userCred = await createUserWithEmailAndPassword(secondaryAuth, email, tempPassword);
     const newUid = userCred.user.uid;
 
-    // Langsung sign out dari secondary app
-    await signOut(secondaryAuth);
-
     // Simpan data profil pengguna ke Firestore
     const newUserDoc = {
       id: newUid,
@@ -230,7 +237,17 @@ export const firebaseAuthService = {
       createdAt: new Date().toISOString()
     };
 
-    await setDoc(doc(db, 'users', newUid), newUserDoc);
+    try {
+      await setDoc(doc(db, 'users', newUid), newUserDoc);
+    } catch (err) {
+      // Profil gagal disimpan: hapus akun Auth agar tidak ada akun yatim tanpa profil
+      await deleteAuthUser(userCred.user).catch(() => {});
+      await signOut(secondaryAuth);
+      throw new Error('Gagal menyimpan profil pengguna. Akun tidak dibuat.');
+    }
+
+    // Keluar dari secondary app (sesi Admin di app utama tidak terpengaruh)
+    await signOut(secondaryAuth);
 
     // Perbarui cache lokal
     const currentList = getCachedUsersList();

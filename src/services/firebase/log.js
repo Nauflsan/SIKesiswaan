@@ -5,7 +5,7 @@
  * Mengelola rekam jejak audit trail aktivitas di koleksi Firestore 'logAktivitas'.
  */
 
-import { db } from '../../lib/firebase.js';
+import { auth, db } from '../../lib/firebase.js';
 import {
   collection,
   doc,
@@ -45,7 +45,7 @@ export const firebaseLogService = {
       const id = 'l_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
       const entry = {
         id,
-        userId: logData.userId || 'sys',
+        userId: auth.currentUser?.uid || logData.userId || 'sys',
         userNama: logData.userNama || 'Sistem',
         aksi: logData.aksi,
         detail: logData.detail,

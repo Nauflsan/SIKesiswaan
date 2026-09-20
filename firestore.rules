@@ -2,68 +2,78 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
+    // ------------------------------------------------------------------
+    // Helper
+    // Akses diberikan HANYA jika pengguna punya dokumen profil di /users,
+    // akunnya aktif, dan role-nya dikenal. Login Firebase saja tidak cukup.
+    // ------------------------------------------------------------------
     function isAuth() {
       return request.auth != null;
     }
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function hasProfile() {
+      return isAuth()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
-    function getRole() {
-      return getUserData().role;
+    function isStaff() {
+      return hasProfile()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive == true
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'guru_bk'];
     }
     function isAdmin() {
-      return isAuth() && getRole() == 'admin';
-    }
-    function isGuruBK() {
-      return isAuth() && (getRole() == 'guru_bk' || getRole() == 'admin');
+      return isStaff()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // 1. Users collection
+    // 1. Users: dokumen profil hanya boleh dibuat/diubah/dihapus oleh Admin.
+    //    Tidak ada pendaftaran mandiri. Admin pertama dibuat manual lewat Console.
     match /users/{userId} {
-      allow read: if isAuth();
-      // Izinkan inisialisasi akun sendiri saat login pertama kali
-      allow create: if isAuth() && (request.auth.uid == userId || isAdmin());
-      allow update, delete: if isAdmin();
+      allow read: if isAuth() && (request.auth.uid == userId || isStaff());
+      allow create, update: if isAdmin()
+        && request.resource.data.role in ['admin', 'guru_bk'];
+      allow delete: if isAdmin();
     }
 
-    // 2. Siswa collection
+    // 2. Siswa
     match /siswa/{siswaId} {
-      allow read: if isAuth();
-      allow create, update: if isGuruBK();
+      allow read: if isStaff();
+      allow create, update: if isStaff();
       allow delete: if isAdmin();
     }
 
-    // 3. Kasus collection
+    // 3. Kasus
     match /kasus/{kasusId} {
-      allow read: if isAuth();
-      allow create, update: if isGuruBK();
+      allow read: if isStaff();
+      allow create, update: if isStaff();
       allow delete: if isAdmin();
     }
 
-    // 4. Kategori collection
+    // 4. Kategori
     match /kategori/{kategoriId} {
-      allow read: if isAuth();
+      allow read: if isStaff();
       allow write: if isAdmin();
     }
 
-    // 5. Surat collection
+    // 5. Surat
     match /surat/{suratId} {
-      allow read: if isAuth();
-      allow create, update: if isGuruBK();
+      allow read: if isStaff();
+      allow create, update: if isStaff();
       allow delete: if isAdmin();
     }
 
-    // 6. Settings collection (singleton)
+    // 6. Settings (singleton). Guru BK hanya boleh menaikkan counter nomor surat.
     match /settings/{settingId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+      allow read: if isStaff();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (isStaff()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['nomorSuratCounter', 'updatedAt']));
     }
 
-    // 7. Log Aktivitas (Immutable audit trail)
+    // 7. Log aktivitas (audit trail, tidak boleh diubah/dihapus)
     match /logAktivitas/{logId} {
-      allow read: if isAuth();
-      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow read: if isStaff();
+      allow create: if isStaff() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if false;
     }
   }
