@@ -82,6 +82,8 @@ export default function Kategori() {
     }
   }
 
+  const isAdmin = user?.role === 'admin';
+
   /**
    * Menyimpan konfigurasi ambang batas SP baru.
    * Melakukan validasi berjenjang (SP1 < SP2 < SP3).
@@ -89,6 +91,10 @@ export default function Kategori() {
    */
   const handleSaveAmbang = async (e) => {
     e.preventDefault();
+    if (!isAdmin) {
+      showToast('Hanya Administrator yang memiliki akses untuk mengubah ambang batas SP', 'error');
+      return;
+    }
     if (ambang.sp1 >= ambang.sp2 || ambang.sp2 >= ambang.sp3) {
       showToast('Urutan ambang batas harus: SP1 < SP2 < SP3', 'error');
       return;
@@ -114,6 +120,10 @@ export default function Kategori() {
    */
   const handleSaveKategori = async (e) => {
     e.preventDefault();
+    if (!isAdmin) {
+      showToast('Hanya Administrator yang memiliki akses untuk mengelola kategori', 'error');
+      return;
+    }
     try {
       if (editingItem) {
         await kategoriService.update(editingItem.id, {
@@ -140,6 +150,10 @@ export default function Kategori() {
   };
 
   const handleDeleteKategori = async (id, nama) => {
+    if (!isAdmin) {
+      showToast('Hanya Administrator yang memiliki akses untuk menghapus kategori', 'error');
+      return;
+    }
     if (!confirm(`Hapus kategori "${nama}"?`)) return;
     try {
       await kategoriService.delete(id, user);
@@ -151,6 +165,10 @@ export default function Kategori() {
   };
 
   const handleToggleActive = async (item) => {
+    if (!isAdmin) {
+      showToast('Hanya Administrator yang memiliki akses untuk mengubah status kategori', 'error');
+      return;
+    }
     try {
       await kategoriService.update(item.id, { isActive: !item.isActive }, user);
       showToast(`Kategori ${item.isActive ? 'dinonaktifkan' : 'diaktifkan'}`, 'info');
@@ -178,17 +196,19 @@ export default function Kategori() {
                   Setiap perubahan poin tidak akan merubah poin kasus lama (historical snapshot).
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  setEditingItem(null);
-                  setFormKategori({ nama: '', poin: 10, deskripsi: '' });
-                  setShowModal(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-semibold rounded-xl shadow-xs transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Tambah Kategori</span>
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setEditingItem(null);
+                    setFormKategori({ nama: '', poin: 10, deskripsi: '' });
+                    setShowModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-semibold rounded-xl shadow-xs transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Kategori</span>
+                </button>
+              )}
             </div>
 
             <div className="divide-y divide-gray-100">
@@ -231,38 +251,40 @@ export default function Kategori() {
                   <div className="flex items-center gap-3 shrink-0">
                     <PoinBadge poin={item.poin} />
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleToggleActive(item)}
-                        className={`text-[11px] px-2 py-1 rounded-lg font-semibold transition-colors ${
-                          item.isActive
-                            ? 'text-gray-500 hover:bg-gray-100'
-                            : 'text-emerald-700 bg-emerald-50'
-                        }`}
-                      >
-                        {item.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-                      </button>
+                    {isAdmin && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleToggleActive(item)}
+                          className={`text-[11px] px-2 py-1 rounded-lg font-semibold transition-colors ${
+                            item.isActive
+                              ? 'text-gray-500 hover:bg-gray-100'
+                              : 'text-emerald-700 bg-emerald-50'
+                          }`}
+                        >
+                          {item.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                        </button>
 
-                      <button
-                        onClick={() => {
-                          setEditingItem(item);
-                          setFormKategori({ nama: item.nama, poin: item.poin, deskripsi: item.deskripsi || '' });
-                          setShowModal(true);
-                        }}
-                        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                        <button
+                          onClick={() => {
+                            setEditingItem(item);
+                            setFormKategori({ nama: item.nama, poin: item.poin, deskripsi: item.deskripsi || '' });
+                            setShowModal(true);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                          title="Edit Kategori"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
 
-                      {user?.role === 'admin' && (
                         <button
                           onClick={() => handleDeleteKategori(item.id, item.nama)}
                           className="p-1.5 text-rose-400 hover:text-rose-700 hover:bg-rose-50 rounded-lg"
+                          title="Hapus Kategori"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -289,9 +311,12 @@ export default function Kategori() {
                   <input
                     type="number"
                     min="1"
+                    disabled={!isAdmin}
                     value={ambang.sp1}
                     onInput={(e) => setAmbang({ ...ambang, sp1: Number(e.target.value) })}
-                    className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-amber-600 focus:ring-1 focus:ring-[#4A6FA5]"
+                    className={`w-full py-2 px-3 border border-gray-200 rounded-xl font-bold ${
+                      !isAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 text-amber-600 focus:ring-1 focus:ring-[#4A6FA5]'
+                    }`}
                   />
                   <span className="font-semibold text-gray-400 shrink-0">Poin</span>
                 </div>
@@ -305,9 +330,12 @@ export default function Kategori() {
                   <input
                     type="number"
                     min="1"
+                    disabled={!isAdmin}
                     value={ambang.sp2}
                     onInput={(e) => setAmbang({ ...ambang, sp2: Number(e.target.value) })}
-                    className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-orange-600 focus:ring-1 focus:ring-[#4A6FA5]"
+                    className={`w-full py-2 px-3 border border-gray-200 rounded-xl font-bold ${
+                      !isAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 text-orange-600 focus:ring-1 focus:ring-[#4A6FA5]'
+                    }`}
                   />
                   <span className="font-semibold text-gray-400 shrink-0">Poin</span>
                 </div>
@@ -321,25 +349,36 @@ export default function Kategori() {
                   <input
                     type="number"
                     min="1"
+                    disabled={!isAdmin}
                     value={ambang.sp3}
                     onInput={(e) => setAmbang({ ...ambang, sp3: Number(e.target.value) })}
-                    className="w-full py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-red-600 focus:ring-1 focus:ring-[#4A6FA5]"
+                    className={`w-full py-2 px-3 border border-gray-200 rounded-xl font-bold ${
+                      !isAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 text-red-600 focus:ring-1 focus:ring-[#4A6FA5]'
+                    }`}
                   />
                   <span className="font-semibold text-gray-400 shrink-0">Poin</span>
                 </div>
               </div>
 
-              <div className="p-3 bg-blue-50 border border-blue-200/80 rounded-xl text-blue-900 leading-relaxed text-[11px]">
-                ℹ️ <strong>Auto-Recalculate:</strong> Mengubah ambang batas akan langsung memicu perhitungan ulang status SP seluruh siswa di database secara instan.
-              </div>
+              {!isAdmin ? (
+                <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-900 leading-relaxed text-[11px]">
+                  🔒 <strong>Akses Terbatas:</strong> Pengaturan ambang batas SP hanya dapat diubah oleh Administrator.
+                </div>
+              ) : (
+                <div className="p-3 bg-blue-50 border border-blue-200/80 rounded-xl text-blue-900 leading-relaxed text-[11px]">
+                  ℹ️ <strong>Auto-Recalculate:</strong> Mengubah ambang batas akan langsung memicu perhitungan ulang status SP seluruh siswa di database secara instan.
+                </div>
+              )}
 
-              <button
-                type="submit"
-                disabled={savingAmbang}
-                className="w-full py-2.5 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white font-bold rounded-xl shadow-xs transition-all active:scale-95 disabled:opacity-50"
-              >
-                {savingAmbang ? 'Menyimpan...' : 'Perbarui Ambang Batas'}
-              </button>
+              {isAdmin && (
+                <button
+                  type="submit"
+                  disabled={savingAmbang}
+                  className="w-full py-2.5 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white font-bold rounded-xl shadow-xs transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {savingAmbang ? 'Menyimpan...' : 'Perbarui Ambang Batas'}
+                </button>
+              )}
             </form>
           </div>
         </div>

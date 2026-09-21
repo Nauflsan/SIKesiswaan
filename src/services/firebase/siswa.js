@@ -63,7 +63,7 @@ export const firebaseSiswaService = {
    * Mendaftarkan data siswa baru secara manual
    */
   create: async (siswaData, currentUser) => {
-    const newId = 's_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    const newId = 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     const newSiswa = {
       id: newId,
       nisn: String(siswaData.nisn).trim(),
@@ -153,49 +153,57 @@ export const firebaseSiswaService = {
     const existingMap = new Map();
     allExistingSnap.docs.forEach(d => {
       const s = d.data();
-      if (s.nisn) existingMap.set(String(s.nisn), { id: d.id, ...s });
+      if (s.nisn && s.isActive !== false && !s.deletedAt) {
+        existingMap.set(String(s.nisn), { id: d.id, ...s });
+      }
     });
 
-    const batch = writeBatch(db);
     let imported = 0;
     let updated = 0;
+    const nowIso = new Date().toISOString();
 
-    for (const item of siswaList) {
-      const nisnKey = String(item.nisn);
-      if (existingMap.has(nisnKey)) {
-        // Update data siswa yang sudah ada
-        const existing = existingMap.get(nisnKey);
-        const ref = doc(db, COLLECTION_NAME, existing.id);
-        batch.update(ref, {
-          nama: item.nama || existing.nama,
-          kelas: item.kelas || existing.kelas,
-          jurusan: item.jurusan || existing.jurusan,
-          updatedAt: new Date().toISOString()
-        });
-        updated++;
-      } else {
-        // Insert siswa baru
-        const newId = 's_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-        const ref = doc(db, COLLECTION_NAME, newId);
-        batch.set(ref, {
-          id: newId,
-          nisn: item.nisn,
-          nama: item.nama,
-          kelas: item.kelas,
-          jurusan: item.jurusan || 'Umum',
-          angkatan: item.angkatan || new Date().getFullYear(),
-          totalPoin: 0,
-          statusSP: 'normal',
-          isActive: true,
-          deletedAt: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-        imported++;
+    // Firestore membatasi 500 operasi per batch: proses bertahap per 400 dokumen
+    for (let i = 0; i < siswaList.length; i += 400) {
+      const chunk = siswaList.slice(i, i + 400);
+      const batch = writeBatch(db);
+
+      for (const item of chunk) {
+        const nisnKey = String(item.nisn);
+        if (existingMap.has(nisnKey)) {
+          // Update data siswa yang sudah ada
+          const existing = existingMap.get(nisnKey);
+          const ref = doc(db, COLLECTION_NAME, existing.id);
+          batch.update(ref, {
+            nama: item.nama || existing.nama,
+            kelas: item.kelas || existing.kelas,
+            jurusan: item.jurusan || existing.jurusan,
+            updatedAt: nowIso
+          });
+          updated++;
+        } else {
+          // Insert siswa baru
+          const newId = 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+          const ref = doc(db, COLLECTION_NAME, newId);
+          batch.set(ref, {
+            id: newId,
+            nisn: item.nisn,
+            nama: item.nama,
+            kelas: item.kelas,
+            jurusan: item.jurusan || 'Umum',
+            angkatan: item.angkatan || new Date().getFullYear(),
+            totalPoin: 0,
+            statusSP: 'normal',
+            isActive: true,
+            deletedAt: null,
+            createdAt: nowIso,
+            updatedAt: nowIso
+          });
+          imported++;
+        }
       }
-    }
 
-    await batch.commit();
+      await batch.commit();
+    }
 
     await firebaseLogService.create({
       userId: currentUser?.id,

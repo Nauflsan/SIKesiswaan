@@ -25,7 +25,7 @@ import { Link } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
-import { kasusService, siswaService, kategoriService } from '../services/index.js';
+import { kasusService, kategoriService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
 import { useAuthStore } from '../stores/authStore.js';
@@ -85,26 +85,25 @@ export default function Kasus() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [kategoriData, data, siswaData] = await Promise.all([
+      const [kategoriData, data] = await Promise.all([
         kategoriService.getAll(),
         kasusService.getAll({
           kelas: selectedKelas !== 'semua' ? selectedKelas : undefined,
           kategoriId: selectedKategori !== 'semua' ? selectedKategori : undefined,
           status: selectedStatus !== 'semua' ? selectedStatus : undefined,
           search: search.trim() || undefined
-        }),
-        siswaService.getAll()
+        })
       ]);
       setKategoriList(kategoriData);
       setKasusList(data);
 
-      // Kumpulkan semua kelas unik yang ada di database siswa untuk opsi dropdown filter
+      // Kumpulkan semua kelas unik dari daftar preset dan kasus yang ada untuk opsi dropdown filter
       const uniqueClasses = Array.from(
         new Set([
           'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
           'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
           'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2',
-          ...siswaData.map(s => s.kelas).filter(Boolean)
+          ...data.map(k => k.siswaKelas).filter(Boolean)
         ])
       ).sort();
       setDistinctKelas(uniqueClasses);

@@ -59,7 +59,7 @@ export const firebaseSuratService = {
    */
   create: async (suratData, currentUser) => {
     const siswaRef = doc(db, 'siswa', suratData.siswaId);
-    const newId = 'srt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    const newId = 'srt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     const suratRef = doc(db, COLLECTION_NAME, newId);
 
     const newSurat = await runTransaction(db, async (tx) => {

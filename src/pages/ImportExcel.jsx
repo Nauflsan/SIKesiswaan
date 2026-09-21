@@ -23,7 +23,6 @@
  */
 
 import { useState, useEffect } from 'preact/hooks';
-import * as XLSX from 'xlsx';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { siswaService, kategoriService, kasusService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
@@ -71,28 +70,33 @@ export default function ImportExcel() {
   /**
    * Menghasilkan dan mengunduh file template .xlsx contoh secara instan di browser
    */
-  const handleDownloadTemplate = () => {
-    const wb = XLSX.utils.book_new();
+  const handleDownloadTemplate = async () => {
+    try {
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
 
-    if (mode === 'siswa') {
-      const sampleData = [
-        { NISN: '0089990001', Nama: 'Ahmad Fauzan', Kelas: 'XI TKJ 1', Jurusan: 'Teknik Komputer dan Jaringan', Angkatan: 2024 },
-        { NISN: '0089990002', Nama: 'Budi Santoso', Kelas: 'X TKR 1', Jurusan: 'Teknik Kendaraan Ringan', Angkatan: 2025 },
-        { NISN: '0089990003', Nama: 'Citra Dewi', Kelas: 'XII TKR 1', Jurusan: 'Teknik Kendaraan Ringan', Angkatan: 2023 }
-      ];
-      const ws = XLSX.utils.json_to_sheet(sampleData);
-      XLSX.utils.book_append_sheet(wb, ws, 'Template Siswa');
-      XLSX.writeFile(wb, 'Template_Data_Siswa_SIKesiswaan.xlsx');
-    } else {
-      const sampleData = [
-        { NISN: '0081234561', Kategori: 'Terlambat Masuk (> 15 menit)', Tanggal: '2026-09-18', Deskripsi: 'Terlambat 20 menit' },
-        { NISN: '0081234562', Kategori: 'Bolos Jam Pelajaran', Tanggal: '2026-09-18', Deskripsi: 'Meninggalkan jam olahraga' }
-      ];
-      const ws = XLSX.utils.json_to_sheet(sampleData);
-      XLSX.utils.book_append_sheet(wb, ws, 'Template Kasus');
-      XLSX.writeFile(wb, 'Template_Data_Kasus_SIKesiswaan.xlsx');
+      if (mode === 'siswa') {
+        const sampleData = [
+          { NISN: '0089990001', Nama: 'Ahmad Fauzan', Kelas: 'XI TKJ 1', Jurusan: 'Teknik Komputer dan Jaringan', Angkatan: 2024 },
+          { NISN: '0089990002', Nama: 'Budi Santoso', Kelas: 'X TKR 1', Jurusan: 'Teknik Kendaraan Ringan', Angkatan: 2025 },
+          { NISN: '0089990003', Nama: 'Citra Dewi', Kelas: 'XII TKR 1', Jurusan: 'Teknik Kendaraan Ringan', Angkatan: 2023 }
+        ];
+        const ws = XLSX.utils.json_to_sheet(sampleData);
+        XLSX.utils.book_append_sheet(wb, ws, 'Template Siswa');
+        XLSX.writeFile(wb, 'Template_Data_Siswa_SIKesiswaan.xlsx');
+      } else {
+        const sampleData = [
+          { NISN: '0081234561', Kategori: 'Terlambat Masuk (> 15 menit)', Tanggal: '2026-09-18', Deskripsi: 'Terlambat 20 menit' },
+          { NISN: '0081234562', Kategori: 'Bolos Jam Pelajaran', Tanggal: '2026-09-18', Deskripsi: 'Meninggalkan jam olahraga' }
+        ];
+        const ws = XLSX.utils.json_to_sheet(sampleData);
+        XLSX.utils.book_append_sheet(wb, ws, 'Template Kasus');
+        XLSX.writeFile(wb, 'Template_Data_Kasus_SIKesiswaan.xlsx');
+      }
+      showToast('Template Excel berhasil diunduh', 'success');
+    } catch (err) {
+      showToast('Gagal mengunduh template: ' + err.message, 'error');
     }
-    showToast('Template Excel berhasil diunduh', 'success');
   };
 
   /**
@@ -105,6 +109,7 @@ export default function ImportExcel() {
     setParsing(true);
 
     try {
+      const XLSX = await import('xlsx');
       const buffer = await selectedFile.arrayBuffer();
       const wb = XLSX.read(buffer, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];

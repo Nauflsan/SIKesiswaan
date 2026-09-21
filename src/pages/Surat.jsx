@@ -59,6 +59,7 @@ export default function Surat() {
 
   // State Pratinjau Lembar Surat Resmi untuk Cetak
   const [previewSurat, setPreviewSurat] = useState(null);
+  const [previewKasusList, setPreviewKasusList] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -80,10 +81,16 @@ export default function Surat() {
       setSiswaList(siswaData);
       setSettings(settingsData);
 
-      // Cek apakah ada query param ?siswaId=... dari tombol "Buat Surat SP" di halaman lain
+      // Cek apakah ada query param ?siswaId=... atau ?id=... dari halaman lain
       const params = new URLSearchParams(window.location.search);
       const sId = params.get('siswaId');
-      if (sId) {
+      const suratId = params.get('id');
+      if (suratId) {
+        const found = suratData.find(s => s.id === suratId);
+        if (found) {
+          setPreviewSurat(found);
+        }
+      } else if (sId) {
         setSelectedSiswaId(sId);
         setShowCreateModal(true);
       }
@@ -110,6 +117,26 @@ export default function Surat() {
       setSelectedKasusIds(data.map(k => k.id)); // Secara default pilih semua kasus aktif
     });
   }, [selectedSiswaId]);
+
+  /**
+   * Mengambil rincian kasus untuk ditampilkan pada pratinjau lembar surat
+   */
+  useEffect(() => {
+    if (!previewSurat?.siswaId) {
+      setPreviewKasusList([]);
+      return;
+    }
+    const ids = Array.isArray(previewSurat.kasusIds) ? previewSurat.kasusIds : [];
+    if (ids.length === 0) {
+      setPreviewKasusList([]);
+      return;
+    }
+    kasusService.getAll({ siswaId: previewSurat.siswaId }).then((data) => {
+      setPreviewKasusList(data.filter(k => ids.includes(k.id)));
+    }).catch(() => {
+      setPreviewKasusList([]);
+    });
+  }, [previewSurat]);
 
   /**
    * Handler penerbitan surat:
@@ -472,6 +499,32 @@ export default function Surat() {
                 <p>
                   Berdasarkan hasil pemantauan ketertiban dan kedisiplinan siswa di lingkungan sekolah, bersama surat ini pihak sekolah menyampaikan pemberitahuan resmi bahwa putra/putri Bapak/Ibu tercatat telah melakukan pelanggaran tata tertib sekolah dengan akumulasi mencapai <strong>{previewSurat.totalPoin} Poin Pelanggaran</strong>.
                 </p>
+
+                {previewKasusList.length > 0 && (
+                  <div className="my-3">
+                    <p className="font-semibold mb-1">Rincian pelanggaran yang tercatat:</p>
+                    <table className="w-full border-collapse border border-gray-400 text-[11px]">
+                      <thead>
+                        <tr className="bg-gray-100 text-left">
+                          <th className="border border-gray-400 px-2 py-1 w-8 text-center">No</th>
+                          <th className="border border-gray-400 px-2 py-1 w-24">Tanggal</th>
+                          <th className="border border-gray-400 px-2 py-1">Bentuk Pelanggaran</th>
+                          <th className="border border-gray-400 px-2 py-1 w-16 text-center">Poin</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewKasusList.map((k, idx) => (
+                          <tr key={k.id || idx}>
+                            <td className="border border-gray-400 px-2 py-1 text-center">{idx + 1}</td>
+                            <td className="border border-gray-400 px-2 py-1">{formatTanggal(k.tanggal)}</td>
+                            <td className="border border-gray-400 px-2 py-1">{k.kategoriNama}{k.deskripsi ? ` (${k.deskripsi})` : ''}</td>
+                            <td className="border border-gray-400 px-2 py-1 text-center font-bold">+{k.poin}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {previewSurat.keteranganTambahan ? (
                   <div className="p-3 border border-black/80 my-2 bg-gray-50/40 text-xs">

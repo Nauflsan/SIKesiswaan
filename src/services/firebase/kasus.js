@@ -98,7 +98,7 @@ export const firebaseKasusService = {
   create: async (kasusData, currentUser) => {
     const siswaRef = doc(db, 'siswa', kasusData.siswaId);
     const kategoriRef = doc(db, 'kategori', kasusData.kategoriId);
-    const newId = 'ks_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    const newId = 'ks_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     const kasusRef = doc(db, COLLECTION_NAME, newId);
     const nowIso = new Date().toISOString();
 

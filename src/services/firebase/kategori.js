@@ -17,6 +17,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
+import { firebaseLogService } from './log.js';
 
 const COLLECTION_NAME = 'kategori';
 
@@ -55,6 +56,16 @@ export const firebaseKategoriService = {
     };
 
     await setDoc(doc(db, COLLECTION_NAME, newId), newKategori);
+
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'tambah_kategori',
+      detail: `Menambahkan kategori: ${newKategori.nama} (${newKategori.poin} pt)`,
+      targetId: newId,
+      targetType: 'kategori'
+    });
+
     return newKategori;
   },
 
@@ -75,14 +86,43 @@ export const firebaseKategoriService = {
 
     await updateDoc(docRef, updateData);
     const snap = await getDoc(docRef);
-    return { id: snap.id, ...snap.data() };
+    const updated = { id: snap.id, ...snap.data() };
+
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'edit_kategori',
+      detail: updateData.isActive !== undefined && Object.keys(updateData).length <= 2
+        ? `${updateData.isActive ? 'Mengaktifkan' : 'Menonaktifkan'} kategori: ${updated.nama}`
+        : `Memperbarui kategori: ${updated.nama}`,
+      targetId: id,
+      targetType: 'kategori'
+    });
+
+    return updated;
   },
 
   /**
    * Menghapus kategori pelanggaran
    */
   delete: async (id, currentUser) => {
+    let nama = id;
+    try {
+      const snap = await getDoc(doc(db, COLLECTION_NAME, id));
+      if (snap.exists()) nama = snap.data().nama || id;
+    } catch (_) {}
+
     await deleteDoc(doc(db, COLLECTION_NAME, id));
+
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'hapus_kategori',
+      detail: `Menghapus kategori: ${nama}`,
+      targetId: id,
+      targetType: 'kategori'
+    });
+
     return true;
   }
 };

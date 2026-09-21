@@ -44,6 +44,7 @@ export default function Log() {
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Hapus (Soft)</span>;
       case 'restore_kasus':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">Pulihkan</span>;
+      case 'buat_surat':
       case 'generate_surat':
       case 'cetak_surat':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Surat SP</span>;

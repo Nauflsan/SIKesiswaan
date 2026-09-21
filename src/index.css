@@ -46,6 +46,29 @@
 
 /* Print utilities */
 @media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-surat-content,
+  #printable-surat-content * {
+    visibility: visible;
+  }
+  #printable-surat-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .fixed,
+  [role="dialog"],
+  .overflow-hidden {
+    overflow: visible !important;
+    position: static !important;
+  }
   .no-print {
     display: none !important;
   }

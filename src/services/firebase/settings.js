@@ -16,6 +16,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { hitungStatusSP } from '../../lib/helpers.js';
+import { firebaseLogService } from './log.js';
 
 const SETTINGS_DOC_REF = doc(db, 'settings', 'global');
 
@@ -110,6 +111,17 @@ export const firebaseSettingsService = {
         );
       }
     }
+
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'ubah_settings',
+      detail: ambangChanged
+        ? `Memperbarui profil sekolah & ambang batas SP (${updatedSettings.ambangSp1}/${updatedSettings.ambangSp2}/${updatedSettings.ambangSp3})`
+        : 'Memperbarui profil sekolah dan pengaturan sistem',
+      targetId: 'global',
+      targetType: 'settings'
+    });
 
     return updatedSettings;
   }

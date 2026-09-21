@@ -37,7 +37,7 @@ export const firebaseLogService = {
    */
   create: async (logData) => {
     try {
-      const id = 'l_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+      const id = 'l_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
       const entry = {
         id,
         userId: auth.currentUser?.uid || logData.userId || 'sys',

@@ -62,7 +62,6 @@ export default function Sidebar() {
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-800">
                 {user?.role || 'Guest'}
               </span>
-              <span className="text-[10px] text-gray-400"></span>
             </div>
           </div>
           <button

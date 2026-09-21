@@ -128,7 +128,7 @@ export function formatWaktu(timestamp) {
 /**
  * Pustaka angka romawi untuk penulisan bulan pada nomor surat kedinasan.
  */
-export const ROMAWI_BULAN = [
+const ROMAWI_BULAN = [
   'I', 'II', 'III', 'IV', 'V', 'VI', 
   'VII', 'VIII', 'IX', 'X', 'XI', 'XII'
 ];
