@@ -47,6 +47,11 @@ export default function Log() {
       case 'generate_surat':
       case 'cetak_surat':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Surat SP</span>;
+      case 'edit_user':
+      case 'ganti_sandi':
+      case 'reset_sandi':
+      case 'hapus_user':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">Akun Pengguna</span>;
       case 'import_siswa':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800">Import Excel</span>;
       default:

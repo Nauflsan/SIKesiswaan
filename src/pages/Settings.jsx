@@ -11,8 +11,9 @@
  *      Telepon, Email, Website, serta data Kepala Sekolah & NIP.
  *    - Nilai ini langsung mengalir ke template surat resmi di modul Surat.jsx.
  * 2. Manajemen Akun Pengguna (RBAC Ketat):
- *    - Hanya pengguna dengan peran 'admin' yang dapat menambah pengguna baru
- *      atau mengubah status aktif/nonaktif akun.
+ *    - Hanya pengguna dengan peran 'admin' yang dapat menambah pengguna baru,
+ *      mengubah data (nama, NIP, role), mengirim reset kata sandi, atau
+ *      mengubah status aktif/nonaktif akun.
  * 3. Status Cloud Database:
  *    - Informasi koneksi dan keamanan Firebase Firestore.
  * =============================================================================
@@ -33,11 +34,20 @@ import {
   UserPlus,
   ShieldCheck,
   ShieldAlert,
-  Trash2
+  Trash2,
+  Pencil,
+  Mail
 } from "lucide-preact";
 
 export default function Settings() {
-  const { user, createUser, toggleUserActive, deleteUser } = useAuthStore();
+  const {
+    user,
+    createUser,
+    updateUser,
+    sendUserPasswordReset,
+    toggleUserActive,
+    deleteUser,
+  } = useAuthStore();
   const { showToast } = useUIStore();
 
   // Tab aktif: 'sekolah' | 'users' | 'database'
@@ -56,6 +66,12 @@ export default function Settings() {
     role: "guru_bk",
   });
   const [submittingUser, setSubmittingUser] = useState(false);
+
+  // State Modal Edit Pengguna (Khusus Admin): pengguna yang sedang diedit atau null
+  const [editingUser, setEditingUser] = useState(null);
+  const [editForm, setEditForm] = useState({ nama: "", nip: "", role: "guru_bk" });
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -135,6 +151,60 @@ export default function Settings() {
       showToast(err.message || "Gagal membuat pengguna baru", "error");
     } finally {
       setSubmittingUser(false);
+    }
+  };
+
+  const openEditUser = (targetUser) => {
+    setEditingUser(targetUser);
+    setEditForm({
+      nama: targetUser.nama || "",
+      nip: !targetUser.nip || targetUser.nip === "-" ? "" : targetUser.nip,
+      role: targetUser.role,
+    });
+  };
+
+  const closeEditUser = () => {
+    setEditingUser(null);
+  };
+
+  /**
+   * Handler simpan perubahan pengguna (nama, NIP, role).
+   */
+  const handleEditUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    setSubmittingEdit(true);
+    try {
+      await updateUser(editingUser.id, {
+        nama: editForm.nama,
+        nip: editForm.nip,
+        role: editForm.role,
+      });
+      showToast(`Data ${editForm.nama.trim()} berhasil diperbarui`, "success");
+      setEditingUser(null);
+      const fresh = await authService.fetchUsersList();
+      setUsersList(fresh);
+    } catch (err) {
+      showToast(friendlyError(err, "Gagal menyimpan perubahan pengguna"), "error");
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
+  /**
+   * Handler kirim tautan reset kata sandi ke email pengguna yang sedang diedit.
+   */
+  const handleSendUserReset = async () => {
+    if (!editingUser) return;
+    setSendingReset(true);
+    try {
+      const { email } = await sendUserPasswordReset(editingUser.id);
+      showToast(`Tautan reset kata sandi dikirim ke ${email}`, "success");
+    } catch (err) {
+      showToast(friendlyError(err, "Gagal mengirim tautan reset"), "error");
+    } finally {
+      setSendingReset(false);
     }
   };
 
@@ -449,7 +519,7 @@ export default function Settings() {
               </h4>
               <p className="text-xs text-gray-500 mt-0.5">
                 {user?.role === "admin"
-                  ? "Anda memiliki hak akses tertinggi (Administrator). Anda dapat menambah pengguna dan mengatur status akun."
+                  ? "Anda memiliki hak akses tertinggi (Administrator). Anda dapat menambah, mengubah, dan mengatur status akun pengguna."
                   : "Ketentuan akses: Hanya Administrator yang berhak menambah atau mengubah akun pengguna sistem."}
               </p>
             </div>
@@ -524,31 +594,40 @@ export default function Settings() {
                     </td>
                     {user?.role === "admin" && (
                       <td className="py-3 px-4 text-right">
-                        {u.id !== user.id ? (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleToggleUserActive(u)}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
-                                u.isActive
-                                  ? "text-amber-700 hover:bg-amber-50 border border-amber-200"
-                                  : "text-emerald-700 hover:bg-emerald-50 border border-emerald-200"
-                              }`}
-                            >
-                              {u.isActive ? "Nonaktifkan" : "Aktifkan"}
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(u)}
-                              className="p-1 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg border border-rose-200 transition-colors"
-                              title="Hapus Akun Pengguna Secara Permanen"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-[11px] italic">
-                            Akun Anda
-                          </span>
-                        )}
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openEditUser(u)}
+                            className="p-1 text-[#4A6FA5] hover:bg-blue-50 hover:text-[#3b5b88] rounded-lg border border-blue-200 transition-colors"
+                            title="Edit Data Pengguna"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          {u.id !== user.id ? (
+                            <>
+                              <button
+                                onClick={() => handleToggleUserActive(u)}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                                  u.isActive
+                                    ? "text-amber-700 hover:bg-amber-50 border border-amber-200"
+                                    : "text-emerald-700 hover:bg-emerald-50 border border-emerald-200"
+                                }`}
+                              >
+                                {u.isActive ? "Nonaktifkan" : "Aktifkan"}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(u)}
+                                className="p-1 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-lg border border-rose-200 transition-colors"
+                                title="Hapus Akun Pengguna Secara Permanen"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-gray-400 text-[11px] italic">
+                              Akun Anda
+                            </span>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -557,6 +636,118 @@ export default function Settings() {
             </table>
             </div>
           </div>
+
+          {/* Modal Edit User (Admin Only) */}
+          {editingUser && (
+            <Modal
+              isOpen={true}
+              onClose={closeEditUser}
+              title="Edit Data Pengguna"
+            >
+              <form onSubmit={handleEditUserSubmit} className="space-y-4 text-xs">
+                <div>
+                  <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                    Nama Lengkap Pengguna <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.nama}
+                    onInput={(e) =>
+                      setEditForm({ ...editForm, nama: e.target.value })
+                    }
+                    className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#4A6FA5]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                    NIP / NUPTK Pegawai
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Kosongkan jika belum ada"
+                    value={editForm.nip}
+                    onInput={(e) =>
+                      setEditForm({ ...editForm, nip: e.target.value })
+                    }
+                    className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#4A6FA5]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                    Email Akun Login
+                  </label>
+                  <input
+                    type="email"
+                    value={editingUser.email || ""}
+                    disabled
+                    className="w-full text-sm py-2 px-3 bg-gray-100 border border-gray-200 rounded-xl font-mono text-gray-500"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Email tidak dapat diubah. Jika salah, hapus akun lalu daftarkan ulang dengan email yang benar.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                    Role Hak Akses <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editForm.role}
+                    disabled={editingUser.id === user.id}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, role: e.target.value })
+                    }
+                    className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl font-semibold disabled:bg-gray-100 disabled:text-gray-500"
+                  >
+                    <option value="guru_bk">🎓 Guru Bimbingan Konseling (BK)</option>
+                    <option value="admin">👑 Administrator</option>
+                  </select>
+                  {editingUser.id === user.id && (
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Anda tidak dapat mengubah role akun Anda sendiri.
+                    </p>
+                  )}
+                </div>
+
+                {editingUser.id !== user.id && (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <p className="text-[11px] text-gray-600 leading-relaxed">
+                      Pengguna lupa kata sandi? Kirim tautan reset ke email pengguna.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleSendUserReset}
+                      disabled={sendingReset}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-semibold text-[#4A6FA5] border border-blue-200 hover:bg-blue-50 rounded-lg shrink-0 disabled:opacity-50"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>{sendingReset ? "Mengirim..." : "Kirim Tautan Reset"}</span>
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={closeEditUser}
+                    className="px-4 py-2 font-semibold text-gray-600 hover:bg-gray-100 rounded-xl"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingEdit}
+                    className="px-5 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white font-bold rounded-xl shadow-xs disabled:opacity-50"
+                  >
+                    {submittingEdit ? "Menyimpan..." : "Simpan Perubahan"}
+                  </button>
+                </div>
+              </form>
+            </Modal>
+          )}
 
           {/* Modal Add User (Admin Only) */}
           {showAddUserModal && (

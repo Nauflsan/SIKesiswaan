@@ -13,6 +13,10 @@ import {
   signOut,
   createUserWithEmailAndPassword,
   deleteUser as deleteAuthUser,
+  sendPasswordResetEmail,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
   getAuth
 } from 'firebase/auth';
 import { initializeApp, getApps } from 'firebase/app';
@@ -32,6 +36,7 @@ import {
 import { firebaseLogService } from './log.js';
 
 const VALID_ROLES = ['admin', 'guru_bk'];
+const ROLE_LABELS = { admin: 'Administrator', guru_bk: 'Guru BK' };
 const LOGIN_TIMEOUT_MS = 15000;
 
 // Berisi { resolve, reject } selama proses login berjalan; diselesaikan oleh listener sesi.
@@ -52,6 +57,47 @@ function validateProfile(snap) {
     return { error: 'Akses ditolak: Akun Anda tidak aktif. Hubungi Administrator.' };
   }
   return { profile };
+}
+
+/**
+ * Mengubah error Firebase Auth menjadi pesan berbahasa Indonesia.
+ * Kode yang tidak dikenal memakai pesan cadangan (fallback).
+ */
+function authErrorMessage(err, fallback) {
+  switch (err?.code) {
+    case 'auth/invalid-email':
+    case 'auth/missing-email':
+      return 'Format alamat email tidak valid.';
+    case 'auth/too-many-requests':
+      return 'Terlalu banyak percobaan. Silakan tunggu beberapa saat lalu coba lagi.';
+    case 'auth/network-request-failed':
+      return 'Gagal terhubung ke server. Periksa koneksi internet Anda.';
+    case 'auth/weak-password':
+    case 'auth/password-does-not-meet-requirements':
+      return 'Kata sandi baru terlalu lemah atau belum memenuhi persyaratan. Gunakan minimal 6 karakter.';
+    case 'auth/requires-recent-login':
+      return 'Sesi perlu diverifikasi ulang. Keluar lalu masuk kembali, kemudian coba lagi.';
+    default:
+      return fallback;
+  }
+}
+
+/**
+ * Mengirim email reset kata sandi lewat Firebase. Melempar Error berbahasa Indonesia bila gagal.
+ * hideUnknownEmail: email yang tidak terdaftar dianggap berhasil (untuk halaman publik).
+ */
+async function sendResetEmail(email, { hideUnknownEmail = false } = {}) {
+  const target = (email || '').trim();
+  if (!target) throw new Error('Masukkan alamat email terlebih dahulu.');
+  try {
+    await sendPasswordResetEmail(auth, target);
+  } catch (err) {
+    if (err.code === 'auth/user-not-found') {
+      if (hideUnknownEmail) return;
+      throw new Error('Email ini belum terdaftar di sistem autentikasi.');
+    }
+    throw new Error(authErrorMessage(err, 'Gagal mengirim tautan reset kata sandi. Silakan coba lagi.'));
+  }
 }
 
 export const firebaseAuthService = {
@@ -244,7 +290,18 @@ export const firebaseAuthService = {
     }
 
     const secondaryAuth = getAuth(secondaryApp);
-    const userCred = await createUserWithEmailAndPassword(secondaryAuth, email, tempPassword);
+    let userCred;
+    try {
+      userCred = await createUserWithEmailAndPassword(secondaryAuth, email, tempPassword);
+    } catch (err) {
+      if (err.code === 'auth/email-already-in-use') {
+        throw new Error(
+          'Email ini sudah terdaftar di Firebase Auth. Jika akunnya pernah dihapus dari daftar pengguna, ' +
+          'hapus juga di Firebase Console (Authentication → Users), atau gunakan email lain.'
+        );
+      }
+      throw new Error(authErrorMessage(err, 'Gagal membuat akun pengguna. Silakan coba lagi.'));
+    }
     const newUid = userCred.user.uid;
 
     // Simpan data profil pengguna ke Firestore
@@ -272,6 +329,137 @@ export const firebaseAuthService = {
     await signOut(secondaryAuth);
 
     return newUserDoc;
+  },
+
+  /**
+   * Lupa kata sandi (halaman Login, tanpa sesi): kirim tautan reset ke email.
+   * Email yang tidak terdaftar dianggap berhasil agar daftar akun tidak bisa ditebak dari luar.
+   */
+  sendPasswordReset: async (email) => {
+    await sendResetEmail(email, { hideUnknownEmail: true });
+    return true;
+  },
+
+  /**
+   * Admin mengirim tautan reset kata sandi ke email pengguna lain.
+   * (Client SDK tidak bisa mengatur sandi orang lain secara langsung.)
+   */
+  sendUserPasswordReset: async (userId, currentUser) => {
+    if (currentUser?.role !== 'admin') {
+      throw new Error('Hanya Administrator yang berhak mengirim reset kata sandi!');
+    }
+
+    const snap = await getDoc(doc(db, 'users', userId));
+    if (!snap.exists()) throw new Error('Pengguna tidak ditemukan di database.');
+    const { nama, email } = snap.data();
+
+    await sendResetEmail(email);
+
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'reset_sandi',
+      detail: `Mengirim tautan reset kata sandi ke ${nama} (${email})`,
+      targetId: userId,
+      targetType: 'user'
+    });
+
+    return { nama, email };
+  },
+
+  /**
+   * Ganti kata sandi akun sendiri. Wajib memasukkan kata sandi saat ini (verifikasi ulang).
+   */
+  changePassword: async (currentPassword, newPassword, currentUser) => {
+    const fbUser = auth.currentUser;
+    if (!fbUser || !fbUser.email) {
+      throw new Error('Sesi berakhir. Silakan masuk kembali.');
+    }
+    if (!currentPassword) throw new Error('Kata sandi saat ini wajib diisi.');
+    if ((newPassword || '').length < 6) {
+      throw new Error('Kata sandi baru minimal 6 karakter.');
+    }
+    if (newPassword === currentPassword) {
+      throw new Error('Kata sandi baru harus berbeda dari kata sandi saat ini.');
+    }
+
+    try {
+      const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
+      await reauthenticateWithCredential(fbUser, credential);
+    } catch (err) {
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+        throw new Error('Kata sandi saat ini salah.');
+      }
+      throw new Error(authErrorMessage(err, 'Gagal memverifikasi kata sandi saat ini. Silakan coba lagi.'));
+    }
+
+    try {
+      await updatePassword(fbUser, newPassword);
+    } catch (err) {
+      throw new Error(authErrorMessage(err, 'Gagal mengganti kata sandi. Silakan coba lagi.'));
+    }
+
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'ganti_sandi',
+      detail: 'Mengganti kata sandi akun sendiri',
+      targetId: fbUser.uid,
+      targetType: 'user'
+    });
+
+    return true;
+  },
+
+  /**
+   * Mengubah data profil pengguna: nama, NIP, dan role (Admin Only).
+   * Email tidak bisa diubah dari sini. Admin tidak boleh mengubah role akunnya sendiri.
+   */
+  updateUser: async (userId, data, currentUser) => {
+    if (currentUser?.role !== 'admin') {
+      throw new Error('Hanya Administrator yang berhak mengubah data pengguna!');
+    }
+
+    const nama = (data?.nama || '').trim();
+    if (!nama) throw new Error('Nama pengguna wajib diisi.');
+    if (!VALID_ROLES.includes(data?.role)) {
+      throw new Error('Role tidak valid. Pilih Administrator atau Guru BK.');
+    }
+    const nip = (data.nip || '').trim() || '-';
+
+    const userDocRef = doc(db, 'users', userId);
+    const snap = await getDoc(userDocRef);
+    if (!snap.exists()) throw new Error('Pengguna tidak ditemukan di database.');
+    const before = snap.data();
+
+    const isSelf = userId === currentUser.id || userId === currentUser.uid;
+    if (isSelf && data.role !== before.role) {
+      throw new Error('Anda tidak dapat mengubah role akun Anda sendiri.');
+    }
+
+    // Bandingkan dengan data lama; jika tidak ada yang berubah, tidak perlu menulis
+    const prev = { nama: before.nama, nip: before.nip ?? '-', role: before.role };
+    const next = { nama, nip, role: data.role };
+    const changes = [];
+    if (prev.nama !== next.nama) changes.push(`nama "${prev.nama}" → "${next.nama}"`);
+    if (prev.nip !== next.nip) changes.push(`NIP ${prev.nip} → ${next.nip}`);
+    if (prev.role !== next.role) {
+      changes.push(`role ${ROLE_LABELS[prev.role] || prev.role} → ${ROLE_LABELS[next.role]}`);
+    }
+    if (changes.length === 0) return { id: userId, ...before };
+
+    await updateDoc(userDocRef, { ...next, updatedAt: serverTimestamp() });
+
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'edit_user',
+      detail: `Mengubah data pengguna ${prev.nama}: ${changes.join(', ')}`,
+      targetId: userId,
+      targetType: 'user'
+    });
+
+    return { id: userId, ...before, ...next };
   },
 
   /**

@@ -26,11 +26,18 @@ service cloud.firestore {
 
     // 1. Users: dokumen profil hanya boleh dibuat/diubah/dihapus oleh Admin.
     //    Tidak ada pendaftaran mandiri. Admin pertama dibuat manual lewat Console.
+    //    Admin tidak boleh mengubah role/status aktif atau menghapus akunnya sendiri,
+    //    supaya sistem tidak pernah berakhir tanpa admin.
     match /users/{userId} {
       allow read: if isAuth() && (request.auth.uid == userId || isStaff());
-      allow create, update: if isAdmin()
+      allow create: if isAdmin()
         && request.resource.data.role in ['admin', 'guru_bk'];
-      allow delete: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.role in ['admin', 'guru_bk']
+        && (request.auth.uid != userId
+            || (request.resource.data.role == resource.data.role
+                && request.resource.data.isActive == resource.data.isActive));
+      allow delete: if isAdmin() && request.auth.uid != userId;
     }
 
     // 2. Siswa

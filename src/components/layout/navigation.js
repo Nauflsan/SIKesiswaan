@@ -12,7 +12,8 @@ import {
   FileSpreadsheet,
   FileText,
   History,
-  Settings
+  Settings,
+  UserCog
 } from 'lucide-preact';
 
 export const navigation = [
@@ -23,7 +24,8 @@ export const navigation = [
   { name: 'Import Data Excel', href: '/import', icon: FileSpreadsheet, roles: ['admin', 'guru_bk'] },
   { name: 'Surat Peringatan (SP)', shortName: 'Surat', href: '/surat', icon: FileText, roles: ['admin', 'guru_bk'], tab: true },
   { name: 'Log Aktivitas', href: '/log', icon: History, roles: ['admin', 'guru_bk'] },
-  { name: 'Pengaturan Sistem', href: '/settings', icon: Settings, roles: ['admin'] }
+  { name: 'Pengaturan Sistem', href: '/settings', icon: Settings, roles: ['admin'] },
+  { name: 'Akun Saya', href: '/akun', icon: UserCog }
 ];
 
 /** Apakah pengguna boleh melihat menu ini? */

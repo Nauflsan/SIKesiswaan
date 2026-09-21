@@ -88,5 +88,33 @@ export const useAuthStore = create((set, get) => ({
    */
   deleteUser: async (userId) => {
     return authService.deleteUser(userId, get().user);
+  },
+
+  /**
+   * LOGIKA ADMIN: Mengubah nama, NIP, dan role pengguna.
+   */
+  updateUser: async (userId, data) => {
+    return authService.updateUser(userId, data, get().user);
+  },
+
+  /**
+   * LOGIKA ADMIN: Mengirim tautan reset kata sandi ke email pengguna lain.
+   */
+  sendUserPasswordReset: async (userId) => {
+    return authService.sendUserPasswordReset(userId, get().user);
+  },
+
+  /**
+   * Lupa kata sandi: kirim tautan reset ke email (bisa dipakai tanpa login).
+   */
+  sendPasswordReset: async (email) => {
+    return authService.sendPasswordReset(email);
+  },
+
+  /**
+   * Ganti kata sandi akun yang sedang login (wajib kata sandi saat ini).
+   */
+  changePassword: async (currentPassword, newPassword) => {
+    return authService.changePassword(currentPassword, newPassword, get().user);
   }
 }));

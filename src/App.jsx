@@ -15,6 +15,7 @@ import ImportExcel from './pages/ImportExcel.jsx';
 import Surat from './pages/Surat.jsx';
 import Log from './pages/Log.jsx';
 import Settings from './pages/Settings.jsx';
+import Akun from './pages/Akun.jsx';
 import Login from './pages/Login.jsx';
 
 function FullScreenMessage({ children }) {
@@ -85,6 +86,7 @@ export default function App() {
           <Route path="/surat" component={Surat} />
           <Route path="/log" component={Log} />
           <Route path="/settings">{only(['admin'], Settings)}</Route>
+          <Route path="/akun" component={Akun} />
         </>
       )}
 
