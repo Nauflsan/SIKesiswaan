@@ -424,44 +424,60 @@ export default function Surat() {
             {/* Official Letterhead Paper View */}
             <div
               id="printable-surat-content"
-              className="surat-resmi bg-white p-10 sm:p-14 border border-gray-400 rounded-lg shadow-sm text-black leading-relaxed"
-              style={{ fontFamily: "'Times New Roman', Times, Georgia, serif", minHeight: '700px' }}
+              className="surat-resmi bg-white p-8 sm:p-12 border border-gray-300 rounded-lg shadow-sm text-black leading-relaxed"
+              style={{ fontFamily: "'Times New Roman', Times, Georgia, serif" }}
             >
               {/* Kop Surat Resmi */}
-              <div className="text-center pb-3 mb-5 border-b-[3px] border-double border-black">
-                {settings.pemerintahDaerah && (
-                  <h3 className="text-sm font-bold uppercase tracking-wider leading-tight">
-                    {settings.pemerintahDaerah}
-                  </h3>
-                )}
-                {settings.dinasPendidikan && (
-                  <h4 className="text-sm font-bold uppercase tracking-wider leading-tight">
-                    {settings.dinasPendidikan}
-                  </h4>
-                )}
-                <h1 className="text-xl sm:text-2xl font-black uppercase text-black tracking-wide my-1">
-                  {settings.namaSekolah || 'SMKS Kharisma Panongan'}
-                </h1>
-                <p className="text-[12px] text-black leading-tight">
-                  {settings.alamatSekolah || '(Alamat sekolah belum diisi di Pengaturan)'}
-                  {settings.teleponSekolah ? ` • Telp: ${settings.teleponSekolah}` : ''}
-                </p>
-                {(settings.websiteSekolah || settings.emailSekolah) && (
-                  <p className="text-[11px] text-black leading-tight italic">
-                    {settings.websiteSekolah ? `Laman: ${settings.websiteSekolah}` : ''}
-                    {settings.websiteSekolah && settings.emailSekolah ? ' • ' : ''}
-                    {settings.emailSekolah ? `Pos-el: ${settings.emailSekolah}` : ''}
-                  </p>
-                )}
+              <div className="pb-3 mb-5 border-b-[3px] border-double border-black">
+                <div className="flex items-center gap-4">
+                  {/* Logo Sekolah di Kiri */}
+                  <div className="w-20 shrink-0 flex items-center justify-center">
+                    <img
+                      src="/Logo1-removebg-preview.png"
+                      alt="Logo SMKS Kharisma Panongan"
+                      className="w-18 h-18 object-contain"
+                    />
+                  </div>
+
+                  {/* Identitas Sekolah di Tengah */}
+                  <div className="flex-1 text-center pr-4 sm:pr-0">
+                    {settings.pemerintahDaerah && (
+                      <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider leading-tight text-black">
+                        {settings.pemerintahDaerah}
+                      </h3>
+                    )}
+                    {settings.dinasPendidikan && (
+                      <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider leading-tight text-black">
+                        {settings.dinasPendidikan}
+                      </h4>
+                    )}
+                    <h1 className="text-lg sm:text-2xl font-black uppercase text-black tracking-wide my-0.5">
+                      {settings.namaSekolah || 'SMKS KHARISMA PANONGAN'}
+                    </h1>
+                    <p className="text-[11px] text-black leading-tight">
+                      {settings.alamatSekolah || 'Jl. Raya Panongan No. 1, Kab. Tangerang, Banten'}
+                      {settings.teleponSekolah ? ` • Telp: ${settings.teleponSekolah}` : ''}
+                    </p>
+                    {(settings.websiteSekolah || settings.emailSekolah) && (
+                      <p className="text-[10px] text-black leading-tight italic mt-0.5">
+                        {settings.websiteSekolah ? `Laman: ${settings.websiteSekolah}` : ''}
+                        {settings.websiteSekolah && settings.emailSekolah ? ' • ' : ''}
+                        {settings.emailSekolah ? `Pos-el: ${settings.emailSekolah}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  {/* Spacer penyeimbang di sisi kanan untuk tampilan desktop */}
+                  <div className="w-20 shrink-0 hidden sm:block" />
+                </div>
               </div>
 
               {/* Header Surat: Nomor, Lampiran, Hal */}
-              <div className="flex justify-between items-start text-xs mb-6">
-                <table className="text-xs">
+              <div className="flex justify-between items-start text-xs mb-6 gap-4">
+                <table className="text-xs shrink-0" style={{ width: 'auto' }}>
                   <tbody>
                     <tr><td className="w-20 py-0.5">Nomor</td><td>: {previewSurat.nomorSurat}</td></tr>
                     <tr><td className="py-0.5">Lampiran</td><td>: -</td></tr>
-                    <tr><td className="py-0.5">Perihal</td><td>: <strong>
+                    <tr><td className="py-0.5 align-top">Perihal</td><td className="align-top">: <strong>
                       {previewSurat.jenis === 'sp1'
                         ? 'Surat Peringatan Pertama (SP 1)'
                         : previewSurat.jenis === 'sp2'
@@ -472,8 +488,8 @@ export default function Surat() {
                     </strong></td></tr>
                   </tbody>
                 </table>
-                <div className="text-right text-xs">
-                  <p>{settings.kotaSekolah || '(Kota)'}, {formatTanggal(previewSurat.tanggalSurat)}</p>
+                <div className="text-right text-xs shrink-0 whitespace-nowrap pt-0.5">
+                  <p>{settings.kotaSekolah || 'Tangerang'}, {formatTanggal(previewSurat.tanggalSurat)}</p>
                 </div>
               </div>
 
@@ -503,22 +519,22 @@ export default function Surat() {
                 {previewKasusList.length > 0 && (
                   <div className="my-3">
                     <p className="font-semibold mb-1">Rincian pelanggaran yang tercatat:</p>
-                    <table className="w-full border-collapse border border-gray-400 text-[11px]">
+                    <table className="w-full border-collapse border border-black text-[11px]">
                       <thead>
                         <tr className="bg-gray-100 text-left">
-                          <th className="border border-gray-400 px-2 py-1 w-8 text-center">No</th>
-                          <th className="border border-gray-400 px-2 py-1 w-24">Tanggal</th>
-                          <th className="border border-gray-400 px-2 py-1">Bentuk Pelanggaran</th>
-                          <th className="border border-gray-400 px-2 py-1 w-16 text-center">Poin</th>
+                          <th className="border border-black px-2 py-1.5 w-8 text-center">No</th>
+                          <th className="border border-black px-2 py-1.5 w-24">Tanggal</th>
+                          <th className="border border-black px-2 py-1.5">Bentuk Pelanggaran</th>
+                          <th className="border border-black px-2 py-1.5 w-16 text-center">Poin</th>
                         </tr>
                       </thead>
                       <tbody>
                         {previewKasusList.map((k, idx) => (
                           <tr key={k.id || idx}>
-                            <td className="border border-gray-400 px-2 py-1 text-center">{idx + 1}</td>
-                            <td className="border border-gray-400 px-2 py-1">{formatTanggal(k.tanggal)}</td>
-                            <td className="border border-gray-400 px-2 py-1">{k.kategoriNama}{k.deskripsi ? ` (${k.deskripsi})` : ''}</td>
-                            <td className="border border-gray-400 px-2 py-1 text-center font-bold">+{k.poin}</td>
+                            <td className="border border-black px-2 py-1 text-center">{idx + 1}</td>
+                            <td className="border border-black px-2 py-1 whitespace-nowrap">{formatTanggal(k.tanggal)}</td>
+                            <td className="border border-black px-2 py-1">{k.kategoriNama}{k.deskripsi ? ` (${k.deskripsi})` : ''}</td>
+                            <td className="border border-black px-2 py-1 text-center font-bold">+{k.poin}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -543,8 +559,8 @@ export default function Surat() {
               </div>
 
               {/* Tanda Tangan Resmi */}
-              <div className="grid grid-cols-2 gap-8 pt-10 mt-6 text-xs">
-                <div>
+              <div className="flex justify-between items-start pt-8 mt-6 text-xs text-black">
+                <div className="w-56 text-left">
                   <p>Mengetahui,</p>
                   <p className="font-bold">Guru Bimbingan Konseling (BK)</p>
                   <div className="h-20"></div>
@@ -552,8 +568,8 @@ export default function Surat() {
                   <p className="text-[11px]">NIP. {previewSurat.createdByNip || user?.nip || '-'}</p>
                 </div>
 
-                <div className="text-right">
-                  <p>{settings.kotaSekolah || '(Kota)'}, {formatTanggal(previewSurat.tanggalSurat)}</p>
+                <div className="w-56 text-right">
+                  <p className="invisible">Mengetahui,</p>
                   <p className="font-bold">Kepala Sekolah,</p>
                   <div className="h-20"></div>
                   <p className="font-bold underline uppercase">{settings.namaKepsek || '(Nama Kepala Sekolah belum diisi)'}</p>

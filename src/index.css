@@ -44,43 +44,109 @@
   font-family: 'Times New Roman', Times, Georgia, serif !important;
 }
 
-/* Print utilities */
+/* Print utilities (Standar A4 Kedinasan & Bebas Distorsi) */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm 20mm 15mm 20mm;
+  }
+
+  /* Matikan seluruh animasi, transformasi, bayangan, dan transisi saat mencetak */
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Sembunyikan seluruh UI umum aplikasi */
   body * {
     visibility: hidden;
   }
+
+  /* Tampilkan hanya konten dokumen resmi yang dicetak */
   #printable-surat-content,
   #printable-surat-content *,
   #printable-rekap-content,
   #printable-rekap-content * {
     visibility: visible;
   }
+
   #printable-surat-content,
   #printable-rekap-content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    background: transparent !important;
+    display: block !important;
+    z-index: 999999 !important;
   }
+
+  /* Netralkan elemen pembungkus modal & dialog saat mencetak */
   .fixed,
-  [role="dialog"],
-  .overflow-hidden {
-    overflow: visible !important;
+  [role="dialog"] {
     position: static !important;
+    overflow: visible !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-height: none !important;
   }
-  .no-print {
+
+  .no-print,
+  button,
+  nav,
+  aside,
+  header {
     display: none !important;
   }
+
   .print-only {
     display: block !important;
   }
-  body {
-    background: white !important;
-    color: black !important;
+
+  .surat-resmi,
+  .surat-resmi * {
+    color: #000000 !important;
+  }
+
+  .surat-resmi table {
+    border-collapse: collapse !important;
+  }
+
+  .surat-resmi table.w-full {
+    width: 100% !important;
+  }
+
+  /* Cegah bagian krusial surat terpotong di tengah halaman */
+  .surat-resmi table,
+  .surat-resmi .kop-surat,
+  .surat-resmi .tanda-tangan,
+  .surat-resmi tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }
 
@@ -208,7 +274,7 @@
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 

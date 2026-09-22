@@ -13,6 +13,7 @@ import {
   getDocs,
   runTransaction,
   query,
+  where,
   orderBy
 } from 'firebase/firestore';
 import { formatRomawi } from '../../lib/helpers.js';
