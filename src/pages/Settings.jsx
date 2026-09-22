@@ -20,6 +20,7 @@
  */
 
 import { useState, useEffect } from "preact/hooks";
+import { Link } from "wouter-preact";
 import AppLayout from "../components/layout/AppLayout.jsx";
 import Modal from "../components/ui/Modal.jsx";
 import { settingsService, authService } from "../services/index.js";
@@ -36,7 +37,10 @@ import {
   ShieldAlert,
   Trash2,
   Pencil,
-  Mail
+  Mail,
+  FileSpreadsheet,
+  FileText,
+  ArrowRight
 } from "lucide-preact";
 
 export default function Settings() {
@@ -886,17 +890,16 @@ export default function Settings() {
       )}
 
       {activeTab === "database" && (
-        <div className="max-w-2xl bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-6">
-          <div className="space-y-4">
+        <div className="max-w-3xl space-y-6">
+          {/* Card 1: Status Cloud Database */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
             <div>
               <h4 className="font-bold font-heading text-sm text-gray-900 mb-1 flex items-center gap-2">
                 <Cloud className="w-4 h-4 text-[#4A6FA5]" />
                 <span>Status Cloud Database (Firebase Firestore)</span>
               </h4>
               <p className="text-xs text-gray-500 leading-relaxed">
-                Sistem terhubung secara realtime ke server Google Cloud
-                Firestore. Seluruh perubahan siswa, kasus, dan surat tersimpan
-                secara aman dan terenkripsi.
+                Sistem terhubung secara realtime ke server Google Cloud Firestore. Seluruh perubahan data siswa, kasus, dan surat tersimpan secara aman dan terenkripsi.
               </p>
             </div>
 
@@ -928,17 +931,99 @@ export default function Settings() {
               </div>
               <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
                 <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">
-                  Enkripsi Data
+                  Protokol Keamanan
                 </span>
                 <span className="font-semibold text-gray-800">
-                  TLS 1.3 & AES-256
+                  TLS 1.3 & AES-256 (At-Rest)
                 </span>
               </div>
             </div>
+          </div>
 
-            <div className="p-3.5 bg-blue-50/70 border border-blue-200/70 rounded-xl text-xs text-blue-900 leading-relaxed">
-              ℹ️ <b>Keamanan Terkelola:</b> Dalam mode cloud production, database terproteksi penuh
-              oleh Firestore Security Rules di server Google Cloud.
+          {/* Card 2: Kepatuhan Regulasi & Perlindungan Data Pribadi (UU PDP) */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 text-gray-900 font-heading font-bold text-sm">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Kepatuhan Regulasi & Perlindungan Data (UU No. 27/2022)</span>
+            </div>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              SIK-Kharisma dirancang dengan prinsip <b>Privacy by Design</b> untuk melindungi hak-hak privasi peserta didik dan mematuhi regulasi Undang-Undang Perlindungan Data Pribadi (UU PDP).
+            </p>
+
+            <div className="space-y-2.5 text-xs text-gray-600">
+              <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl flex items-start gap-2.5">
+                <span className="text-emerald-600 font-bold mt-0.5">✓</span>
+                <div>
+                  <strong className="text-gray-800">Klasifikasi Data Spesifik:</strong> Seluruh riwayat kedisiplinan dan identitas siswa di bawah umur diklasifikasikan sebagai data rahasia sekolah dan dilarang dipublikasikan ke ranah umum.
+                </div>
+              </div>
+
+              <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl flex items-start gap-2.5">
+                <span className="text-emerald-600 font-bold mt-0.5">✓</span>
+                <div>
+                  <strong className="text-gray-800">Minimisasi Risiko Kebocoran:</strong> Sistem sengaja meniadakan fitur unduh database mentah (dump JSON) ke komputer lokal guna mengantisipasi insiden kebocoran data lokal (Pasal 46 UU PDP).
+                </div>
+              </div>
+
+              <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl flex items-start gap-2.5">
+                <span className="text-emerald-600 font-bold mt-0.5">✓</span>
+                <div>
+                  <strong className="text-gray-800">Otorisasi Server-Side (RBAC):</strong> Izin akses data ditegakkan di level database Google Cloud melalui Firestore Security Rules, bukan sekadar pembatasan tampilan antarmuka.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Pusat Ekspor Laporan Resmi Administratif */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+            <div>
+              <h4 className="font-bold font-heading text-sm text-gray-900 mb-1 flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4 text-[#4A6FA5]" />
+                <span>Pengarsipan & Ekspor Dokumen Resmi Sekolah</span>
+              </h4>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Untuk kebutuhan arsip LPJ tahunan, buku induk, dan pelaporan kedinasan, gunakan modul ekspor resmi yang telah terformat rapi:
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Link
+                href="/rekap"
+                className="p-4 bg-gray-50 hover:bg-blue-50/60 border border-gray-200/80 hover:border-blue-300 rounded-xl transition-all group flex flex-col justify-between"
+              >
+                <div>
+                  <span className="text-xs font-bold text-gray-800 group-hover:text-[#4A6FA5] flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#4A6FA5]" />
+                    <span>Rekapitulasi Pelanggaran & Cetak A4</span>
+                  </span>
+                  <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                    Filter periode dinamis, cetak lembar fisik bertanda tangan, dan ekspor spreadsheet kasus.
+                  </p>
+                </div>
+                <span className="text-[11px] font-semibold text-[#4A6FA5] mt-3 inline-flex items-center gap-1">
+                  <span>Buka Modul Rekap</span>
+                  <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                </span>
+              </Link>
+
+              <Link
+                href="/siswa"
+                className="p-4 bg-gray-50 hover:bg-blue-50/60 border border-gray-200/80 hover:border-blue-300 rounded-xl transition-all group flex flex-col justify-between"
+              >
+                <div>
+                  <span className="text-xs font-bold text-gray-800 group-hover:text-[#4A6FA5] flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-[#4A6FA5]" />
+                    <span>Master Data Siswa & Status SP</span>
+                  </span>
+                  <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                    Daftar lengkap siswa aktif/lulus/pindah, poin akumulasi, dan kartu riwayat kedisiplinan.
+                  </p>
+                </div>
+                <span className="text-[11px] font-semibold text-[#4A6FA5] mt-3 inline-flex items-center gap-1">
+                  <span>Buka Daftar Siswa</span>
+                  <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                </span>
+              </Link>
             </div>
           </div>
         </div>
