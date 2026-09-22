@@ -19,10 +19,10 @@
  * =============================================================================
  */
 
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import { Link } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
-import { SPBadge } from '../components/ui/Badge.jsx';
+import { SPBadge, StatusSiswaBadge } from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { siswaService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
@@ -41,13 +41,14 @@ export default function Siswa() {
   const { user } = useAuthStore();
   const { showToast } = useUIStore();
 
-  // State data siswa & filter
-  const [siswaList, setSiswaList] = useState([]);
+  // State data siswa mentah dari Firestore (belum difilter) & kontrol filter
+  const [rawSiswaList, setRawSiswaList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState('');
   const [selectedKelas, setSelectedKelas] = useState('semua');
   const [selectedStatusSP, setSelectedStatusSP] = useState('semua');
+  const [selectedStatusSiswa, setSelectedStatusSiswa] = useState('aktif');
 
   // State modal penambahan siswa baru
   const [showAddModal, setShowAddModal] = useState(false);
@@ -62,22 +63,20 @@ export default function Siswa() {
   });
 
   /**
-   * Mengambil daftar siswa saat komponen dimuat atau filter diubah
+   * Mengambil seluruh daftar siswa dari Firestore SATU KALI saat komponen dimuat.
+   * Filter Kelas, Status SP, Status Siswa, dan pencarian dilakukan di memori klien (useMemo)
+   * agar tidak menembak ulang kuota baca Firestore setiap filter diubah.
    */
   useEffect(() => {
     loadSiswa();
-  }, [selectedKelas, selectedStatusSP]);
+  }, []);
 
   async function loadSiswa() {
     setLoading(true);
     setLoadError(null);
     try {
-      const data = await siswaService.getAll({
-        kelas: selectedKelas !== 'semua' ? selectedKelas : undefined,
-        statusSP: selectedStatusSP !== 'semua' ? selectedStatusSP : undefined,
-        search: search.trim() || undefined
-      });
-      setSiswaList(data);
+      const data = await siswaService.getAll();
+      setRawSiswaList(data);
     } catch (err) {
       const msg = friendlyError(err, 'Gagal memuat daftar siswa');
       setLoadError(msg);
@@ -87,15 +86,41 @@ export default function Siswa() {
     }
   }
 
-  // Menghimpun daftar kelas unik secara reaktif dari data siswa yang ada
-  const distinctKelas = Array.from(
+  // Daftar siswa yang sudah difilter — dihitung ulang di memori, bukan fetch baru ke Firestore
+  const siswaList = useMemo(() => {
+    let list = rawSiswaList;
+
+    if (selectedKelas !== 'semua') {
+      list = list.filter(s => s.kelas === selectedKelas);
+    }
+    if (selectedStatusSP !== 'semua') {
+      list = list.filter(s => s.statusSP === selectedStatusSP);
+    }
+    if (selectedStatusSiswa !== 'semua') {
+      // Siswa lama tanpa field statusSiswa dianggap 'aktif'
+      list = list.filter(s => (s.statusSiswa || 'aktif') === selectedStatusSiswa);
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(s =>
+        (s.nama && s.nama.toLowerCase().includes(q)) ||
+        (s.nisn && s.nisn.includes(q))
+      );
+    }
+
+    return list;
+  }, [rawSiswaList, selectedKelas, selectedStatusSP, selectedStatusSiswa, search]);
+
+  // Menghimpun daftar kelas unik secara reaktif dari SELURUH data siswa (bukan hasil filter),
+  // supaya pilihan kelas di dropdown tidak menyusut saat sedang memfilter.
+  const distinctKelas = useMemo(() => Array.from(
     new Set([
       'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
       'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
       'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2',
-      ...siswaList.map(s => s.kelas).filter(Boolean)
+      ...rawSiswaList.map(s => s.kelas).filter(Boolean)
     ])
-  ).sort();
+  ).sort(), [rawSiswaList]);
 
   /**
    * Handler penambahan siswa baru ke database
@@ -137,10 +162,7 @@ export default function Siswa() {
             type="text"
             placeholder="Cari nama siswa atau NISN..."
             value={search}
-            onInput={(e) => {
-              setSearch(e.target.value);
-            }}
-            onChange={() => loadSiswa()}
+            onInput={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#4A6FA5]/20 focus:border-[#4A6FA5]"
           />
         </div>
@@ -193,6 +215,18 @@ export default function Siswa() {
           <option value="sp2">Status SP 2</option>
           <option value="sp3">Status SP 3 (DO)</option>
         </select>
+
+        <select
+          value={selectedStatusSiswa}
+          onChange={(e) => setSelectedStatusSiswa(e.target.value)}
+          className="text-xs py-1.5 px-3 bg-gray-50 border border-gray-200 rounded-lg font-medium cursor-pointer"
+        >
+          <option value="aktif">Siswa Aktif</option>
+          <option value="lulus">Lulus</option>
+          <option value="pindah">Pindah Sekolah</option>
+          <option value="keluar">Keluar / DO</option>
+          <option value="semua">Semua Status</option>
+        </select>
       </div>
 
       {/* Student Cards Grid */}
@@ -225,6 +259,12 @@ export default function Siswa() {
                   </span>
                   <SPBadge status={siswa.statusSP} />
                 </div>
+
+                {siswa.statusSiswa && siswa.statusSiswa !== 'aktif' && (
+                  <div className="mb-1.5">
+                    <StatusSiswaBadge status={siswa.statusSiswa} />
+                  </div>
+                )}
 
                 <h3 className="font-bold font-heading text-sm text-gray-900 group-hover:text-[#4A6FA5] transition-colors line-clamp-1">
                   {siswa.nama}

@@ -38,6 +38,9 @@ export const defaultSchoolSettings = {
   ambangSp3: 110,
   formatNomorSurat: '{{urut}}/{{jenis}}/{{kode}}/{{bulan-romawi}}/{{tahun}}',
   kodeSekolah: 'SMK-KHP',
+  // Bulan mulai tahun ajaran (1-12). Dipakai untuk menurunkan label tahun ajaran
+  // dari tanggal kasus secara on-the-fly — tidak disimpan per-kasus.
+  bulanMulaiTahunAjaran: 7,
   nomorSuratCounter: 1,
   updatedAt: new Date().toISOString()
 };

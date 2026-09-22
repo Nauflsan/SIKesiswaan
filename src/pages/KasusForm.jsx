@@ -179,11 +179,13 @@ export default function KasusForm() {
                 className="w-full text-sm py-2.5 px-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#4A6FA5]/20 focus:border-[#4A6FA5] font-medium"
               >
                 <option value="">-- Pilih Nama Siswa / NISN --</option>
-                {siswaList.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.nama} ({s.kelas} • NISN: {s.nisn})
-                  </option>
-                ))}
+                {siswaList
+                  .filter(s => (s.statusSiswa || 'aktif') === 'aktif' || s.id === selectedSiswaId)
+                  .map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.nama} ({s.kelas} • NISN: {s.nisn})
+                    </option>
+                  ))}
               </select>
             </div>
 

@@ -45,6 +45,7 @@ export default function Kategori() {
 
   // State pengaturan form ambang batas SP
   const [ambang, setAmbang] = useState({ sp1: 50, sp2: 80, sp3: 110 });
+  const [bulanMulai, setBulanMulai] = useState(7);
   const [savingAmbang, setSavingAmbang] = useState(false);
 
   // State modal penambahan / pengubahan kategori
@@ -73,6 +74,7 @@ export default function Kategori() {
         sp2: settingsData.ambangSp2 || 80,
         sp3: settingsData.ambangSp3 || 110
       });
+      setBulanMulai(settingsData.bulanMulaiTahunAjaran || 7);
     } catch (err) {
       const msg = friendlyError(err, 'Gagal memuat data kategori');
       setLoadError(msg);
@@ -104,9 +106,10 @@ export default function Kategori() {
       await settingsService.update({
         ambangSp1: Number(ambang.sp1),
         ambangSp2: Number(ambang.sp2),
-        ambangSp3: Number(ambang.sp3)
+        ambangSp3: Number(ambang.sp3),
+        bulanMulaiTahunAjaran: Number(bulanMulai)
       }, user);
-      showToast('Ambang batas SP berhasil diperbarui! Status siswa telah dihitung ulang secara atomik.', 'success');
+      showToast('Ambang batas SP & tahun ajaran berhasil diperbarui! Status siswa telah dihitung ulang secara atomik.', 'success');
       loadData();
     } catch (err) {
       showToast(err.message || 'Gagal menyimpan ambang batas', 'error');
@@ -358,6 +361,27 @@ export default function Kategori() {
                   />
                   <span className="font-semibold text-gray-400 shrink-0">Poin</span>
                 </div>
+              </div>
+
+              <div className="pt-2 border-t border-gray-100">
+                <label className="block font-bold text-gray-700 mb-1">
+                  Bulan Mulai Tahun Ajaran
+                </label>
+                <select
+                  disabled={!isAdmin}
+                  value={bulanMulai}
+                  onChange={(e) => setBulanMulai(Number(e.target.value))}
+                  className={`w-full py-2 px-3 border border-gray-200 rounded-xl font-bold ${
+                    !isAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 text-gray-700 focus:ring-1 focus:ring-[#4A6FA5]'
+                  }`}
+                >
+                  {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((nama, idx) => (
+                    <option key={idx} value={idx + 1}>{nama}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Menentukan label tahun ajaran (mis. "2026/2027") pada rekap & surat. Aman diubah kapan saja dihitung ulang otomatis dari tanggal kasus.
+                </p>
               </div>
 
               {!isAdmin ? (

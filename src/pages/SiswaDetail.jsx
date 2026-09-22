@@ -19,11 +19,12 @@
 import { useState, useEffect } from 'preact/hooks';
 import { Link, useRoute } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
-import { SPBadge, KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
+import { SPBadge, KasusStatusBadge, PoinBadge, StatusSiswaBadge } from '../components/ui/Badge.jsx';
 import { siswaService, kasusService, suratService, settingsService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
+import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
-import { formatTanggal } from '../lib/helpers.js';
+import { formatTanggal, formatBadgeStatusSiswa } from '../lib/helpers.js';
 import {
   ArrowLeft,
   FileText,
@@ -37,6 +38,7 @@ export default function SiswaDetail() {
   const [, params] = useRoute('/siswa/:id');
   const siswaId = params?.id;
 
+  const { user } = useAuthStore();
   const { showToast } = useUIStore();
 
   // State profil siswa, daftar kasus, surat terbitan, dan konfigurasi ambang batas
@@ -46,6 +48,37 @@ export default function SiswaDetail() {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('riwayat'); // 'riwayat' | 'surat'
+  const [savingStatus, setSavingStatus] = useState(false);
+
+  const canEditStatus = user?.role === 'admin' || user?.role === 'guru_bk';
+
+  /**
+   * Mengubah status keaktifan siswa (aktif/lulus/pindah/keluar)
+   */
+  async function handleChangeStatusSiswa(newStatus) {
+    if (!siswa || newStatus === (siswa.statusSiswa || 'aktif')) return;
+
+    // Konfirmasi hanya saat siswa dikeluarkan dari status aktif (Lulus/Pindah/Keluar),
+    // supaya klik tidak sengaja di dropdown tidak langsung menulis ke Firestore.
+    if (newStatus !== 'aktif') {
+      const label = formatBadgeStatusSiswa(newStatus).label;
+      const konfirmasi = window.confirm(
+        `Ubah status ${siswa.nama} menjadi "${label}"?\n\nSiswa dengan status ini tidak akan muncul lagi di daftar siswa aktif maupun pilihan "Catat Pelanggaran".`
+      );
+      if (!konfirmasi) return;
+    }
+
+    setSavingStatus(true);
+    try {
+      const updated = await siswaService.update(siswa.id, { statusSiswa: newStatus }, user);
+      setSiswa(updated);
+      showToast('Status siswa berhasil diperbarui', 'success');
+    } catch (err) {
+      showToast(err.message || 'Gagal mengubah status siswa', 'error');
+    } finally {
+      setSavingStatus(false);
+    }
+  }
 
   useEffect(() => {
     if (siswaId) loadData();
@@ -115,6 +148,23 @@ export default function SiswaDetail() {
               <div className="flex items-center gap-2.5">
                 <h2 className="text-xl font-bold font-heading text-gray-900">{siswa.nama}</h2>
                 <SPBadge status={siswa.statusSP} />
+                {canEditStatus ? (
+                  <select
+                    value={siswa.statusSiswa || 'aktif'}
+                    disabled={savingStatus}
+                    onChange={(e) => handleChangeStatusSiswa(e.target.value)}
+                    className="text-xs py-1 px-2 bg-gray-50 border border-gray-200 rounded-lg font-semibold cursor-pointer disabled:opacity-50"
+                  >
+                    <option value="aktif">Aktif</option>
+                    <option value="lulus">Lulus</option>
+                    <option value="pindah">Pindah Sekolah</option>
+                    <option value="keluar">Keluar / DO</option>
+                  </select>
+                ) : (
+                  siswa.statusSiswa && siswa.statusSiswa !== 'aktif' && (
+                    <StatusSiswaBadge status={siswa.statusSiswa} />
+                  )
+                )}
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 NISN: <span className="font-semibold font-mono text-gray-700">{siswa.nisn}</span> • Kelas: <span className="font-bold text-gray-800">{siswa.kelas}</span>

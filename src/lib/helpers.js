@@ -126,6 +126,43 @@ export function formatWaktu(timestamp) {
 }
 
 /**
+ * LOGIKA: Menentukan tahun ajaran (format "YYYY/YYYY+1") dari sebuah tanggal.
+ * Dihitung on-the-fly berdasarkan bulan mulai tahun ajaran di Pengaturan,
+ * BUKAN field tersimpan — supaya aman kalau bulan mulai diubah admin nanti.
+ *
+ * @param {string} tanggalStr - Tanggal kasus/kejadian (YYYY-MM-DD)
+ * @param {number} bulanMulai - Bulan mulai tahun ajaran (1-12, default Juli)
+ * @returns {string} Contoh: "2026/2027"
+ */
+export function hitungTahunAjaran(tanggalStr, bulanMulai = 7) {
+  const d = new Date(tanggalStr);
+  if (isNaN(d.getTime())) return '-';
+  const bulan = d.getMonth() + 1;
+  const tahun = d.getFullYear();
+  const mulai = bulan >= bulanMulai ? tahun : tahun - 1;
+  return `${mulai}/${mulai + 1}`;
+}
+
+/**
+ * TAMPILAN: Menghasilkan label teks dan kelas warna Tailwind untuk badge status keaktifan siswa.
+ *
+ * @param {'aktif' | 'lulus' | 'pindah' | 'keluar'} statusSiswa
+ * @returns {{ label: string, color: string }}
+ */
+export function formatBadgeStatusSiswa(statusSiswa) {
+  switch (statusSiswa) {
+    case 'lulus':
+      return { label: 'Lulus', color: 'bg-blue-100 text-blue-700 border-blue-200' };
+    case 'pindah':
+      return { label: 'Pindah Sekolah', color: 'bg-amber-100 text-amber-700 border-amber-200' };
+    case 'keluar':
+      return { label: 'Keluar / DO', color: 'bg-gray-200 text-gray-700 border-gray-300' };
+    default:
+      return { label: 'Aktif', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+  }
+}
+
+/**
  * Pustaka angka romawi untuk penulisan bulan pada nomor surat kedinasan.
  */
 const ROMAWI_BULAN = [

@@ -5,13 +5,25 @@
  * Komponen penanda visual serbaguna dengan warna representatif sesuai status.
  */
 
-import { formatBadgeStatusSP, formatBadgeKasus } from '../../lib/helpers.js';
+import { formatBadgeStatusSP, formatBadgeKasus, formatBadgeStatusSiswa } from '../../lib/helpers.js';
 
 /**
  * Badge penanda status Surat Peringatan (Normal, SP1, SP2, SP3)
  */
 export function SPBadge({ status }) {
   const badge = formatBadgeStatusSP(status);
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.color}`}>
+      {badge.label}
+    </span>
+  );
+}
+
+/**
+ * Badge penanda status keaktifan siswa (Aktif, Lulus, Pindah, Keluar)
+ */
+export function StatusSiswaBadge({ status }) {
+  const badge = formatBadgeStatusSiswa(status);
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.color}`}>
       {badge.label}

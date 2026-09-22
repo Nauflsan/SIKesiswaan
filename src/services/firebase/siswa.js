@@ -25,7 +25,7 @@ export const firebaseSiswaService = {
   /**
    * Mengambil daftar siswa dengan kriteria filter kelas, status SP, dan pencarian teks.
    */
-  getAll: async ({ kelas, search, statusSP } = {}) => {
+  getAll: async ({ kelas, search, statusSP, statusSiswa } = {}) => {
     const q = query(collection(db, COLLECTION_NAME), orderBy('nama', 'asc'));
     const snap = await getDocs(q);
     let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -38,6 +38,10 @@ export const firebaseSiswaService = {
     }
     if (statusSP && statusSP !== 'semua') {
       list = list.filter(s => s.statusSP === statusSP);
+    }
+    if (statusSiswa && statusSiswa !== 'semua') {
+      // Siswa lama tanpa field statusSiswa dianggap 'aktif'
+      list = list.filter(s => (s.statusSiswa || 'aktif') === statusSiswa);
     }
     if (search) {
       const queryStr = search.toLowerCase();
@@ -73,6 +77,7 @@ export const firebaseSiswaService = {
       angkatan: Number(siswaData.angkatan || new Date().getFullYear()),
       totalPoin: 0,
       statusSP: 'normal',
+      statusSiswa: 'aktif',
       isActive: true,
       deletedAt: null,
       createdAt: new Date().toISOString(),
@@ -193,6 +198,7 @@ export const firebaseSiswaService = {
             angkatan: item.angkatan || new Date().getFullYear(),
             totalPoin: 0,
             statusSP: 'normal',
+            statusSiswa: 'aktif',
             isActive: true,
             deletedAt: null,
             createdAt: nowIso,
