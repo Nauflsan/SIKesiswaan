@@ -26,6 +26,10 @@ export const useAuthStore = create((set, get) => ({
   // Alasan sesi berakhir (mis. akun dinonaktifkan), ditampilkan di halaman login
   sessionMessage: null,
 
+  // Flag transisi animasi logo keluar saat berhasil login
+  isLoginTransition: false,
+  setLoginTransition: (val) => set({ isLoginTransition: val }),
+
   /**
    * Mulai memantau sesi. Aman dipanggil ulang (dipakai tombol "Coba lagi").
    */
@@ -65,7 +69,7 @@ export const useAuthStore = create((set, get) => ({
    */
   logout: async () => {
     await authService.logout();
-    set({ user: null, sessionMessage: null });
+    set({ user: null, sessionMessage: null, isLoginTransition: false });
   },
 
   /**

@@ -18,7 +18,7 @@ export default function Toast() {
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 max-w-md w-full animate-in fade-in slide-in-from-top-4 duration-200">
+    <div className="fixed top-4 right-4 z-50 max-w-md w-full animate-slide-down">
       <div className={`flex items-start gap-3 p-4 rounded-xl border shadow-lg ${borderColors[toast.type || 'success']}`}>
         {icons[toast.type || 'success']}
         <div className="flex-1 text-sm font-medium leading-relaxed">

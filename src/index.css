@@ -83,3 +83,152 @@
     color: black !important;
   }
 }
+
+/* ========================================================================== */
+/* UI ANIMATIONS & MICRO-INTERACTIONS (TAILWIND V4 COMPATIBLE)                */
+/* ========================================================================== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+/* Transisi Layar Sambutan Saat Berhasil Login */
+@keyframes splashFade {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes splashLogoCenter {
+  0% {
+    opacity: 0;
+    transform: scale(0.75) translateY(16px);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.1) translateY(0);
+  }
+  68% {
+    opacity: 1;
+    transform: scale(1.22) translateY(0);
+    filter: drop-shadow(0 15px 35px rgba(74, 111, 165, 0.35));
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5) translateY(-10px);
+    filter: drop-shadow(0 25px 60px rgba(74, 111, 165, 0));
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.35s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+.animate-splash-screen {
+  animation: splashFade 1.15s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+.animate-splash-logo {
+  animation: splashLogoCenter 1.15s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+/* Transisi Masuk Halaman yang Lembut (Page Enter Transition) */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: pageEnter 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Tactile button feedback */
+.btn-tactile {
+  transition: transform 0.1s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.btn-tactile:active {
+  transform: scale(0.97);
+}
+
+/* Card hover lift */
+.card-hover-lift {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+.card-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.06), 0 4px 8px -2px rgba(0, 0, 0, 0.04);
+}

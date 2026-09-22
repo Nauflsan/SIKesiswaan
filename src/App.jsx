@@ -39,7 +39,7 @@ function Forbidden() {
 }
 
 export default function App() {
-  const { user, ready, sessionError, init } = useAuthStore();
+  const { user, ready, sessionError, isLoginTransition, init } = useAuthStore();
 
   // Periksa sesi Firebase sekali saat aplikasi dibuka
   useEffect(() => {
@@ -68,7 +68,7 @@ export default function App() {
 
   return (
     <Switch>
-      <Route path="/login">{user ? <Redirect to="/" /> : <Login />}</Route>
+      <Route path="/login">{user && !isLoginTransition ? <Redirect to="/" /> : <Login />}</Route>
 
       {/* Protected Routes */}
       {!user ? (

@@ -6,7 +6,7 @@ export default function Topbar({ title, subtitle }) {
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-20 px-4 sm:px-8 py-3.5 flex items-center justify-between shadow-2xs">
-      <div>
+      <div key={title} className="animate-fade-in">
         <h1 className="text-xl font-bold font-heading text-gray-900 leading-tight">
           {title || 'SIK-Kharisma'}
         </h1>
@@ -15,12 +15,7 @@ export default function Topbar({ title, subtitle }) {
         )}
       </div>
 
-      {/* Right Controls: Cloud Status & User info */}
-      <div className="flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-1.5 bg-blue-50/80 border border-blue-200/70 px-2.5 py-1 rounded-xl text-[#4A6FA5] text-[11px] font-semibold">
-          <Cloud className="w-3.5 h-3.5 text-[#4A6FA5]" />
-          <span>Firebase Online</span>
-        </div>
+      
 
         {/* User Pill */}
         <div className="flex items-center gap-2.5 pl-2">
@@ -36,7 +31,6 @@ export default function Topbar({ title, subtitle }) {
             </div>
           </div>
         </div>
-      </div>
     </header>
   );
 }

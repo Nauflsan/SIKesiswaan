@@ -61,9 +61,9 @@ export default function BottomNav() {
       </nav>
 
       {showMore && (
-        <div className="md:hidden fixed inset-0 z-50">
+        <div className="md:hidden fixed inset-0 z-50 animate-fade-in">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowMore(false)} />
-          <div className="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-2xl px-4 pt-3 pb-6">
+          <div className="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-2xl px-4 pt-3 pb-6 animate-slide-up">
             <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-4" />
 
             {/* Info pengguna */}

@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'wouter-preact';
 import { useAuthStore } from '../../stores/authStore.js';
-import { ShieldAlert, LogOut } from 'lucide-preact';
+import { LogOut } from 'lucide-preact';
 import { navigation, canAccess, isActivePath } from './navigation.js';
 
 export default function Sidebar() {
@@ -13,8 +13,12 @@ export default function Sidebar() {
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-gray-200 z-30">
       {/* Brand Header */}
       <div className="flex items-center gap-3 px-6 h-18 border-b border-gray-100 bg-[#FAFAF8]/50">
-        <div className="w-10 h-10 rounded-xl bg-[#4A6FA5] flex items-center justify-center text-white shadow-sm shadow-[#4A6FA5]/20">
-          <ShieldAlert className="w-6 h-6" />
+        <div className="w-10 h-10 rounded-xl bg-[#4A6FA5]/10 flex items-center justify-center p-1.5 border border-[#4A6FA5]/20 shadow-xs">
+          <img
+            src="/Logo1-removebg-preview.png"
+            alt="Logo SMK Kharisma"
+            className="w-7 h-7 object-contain drop-shadow-xs"
+          />
         </div>
         <div>
           <span className="font-heading font-extrabold text-lg text-gray-900 tracking-tight block leading-tight">

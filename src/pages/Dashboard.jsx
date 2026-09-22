@@ -155,7 +155,7 @@ export default function Dashboard() {
       {/* Bagian 1: 4 Kartu Statistik Utama */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8">
         {/* Kartu 1: Total Kasus Bulan Berjalan */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex items-center justify-between card-hover-lift">
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Kasus Bulan Ini</p>
             <h3 className="text-2xl font-bold font-heading text-gray-900 mt-1">{stats.totalKasusBulanIni}</h3>
@@ -167,7 +167,7 @@ export default function Dashboard() {
         </div>
 
         {/* Kartu 2: Kasus yang Belum Ditangani */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex items-center justify-between card-hover-lift">
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Perlu Ditangani</p>
             <h3 className="text-2xl font-bold font-heading text-rose-600 mt-1">{stats.belumDitangani}</h3>
@@ -179,7 +179,7 @@ export default function Dashboard() {
         </div>
 
         {/* Kartu 3: Siswa Status SP 1 */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex items-center justify-between card-hover-lift">
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status SP 1</p>
             <h3 className="text-2xl font-bold font-heading text-amber-600 mt-1">{stats.siswaSP1}</h3>
@@ -191,7 +191,7 @@ export default function Dashboard() {
         </div>
 
         {/* Kartu 4: Siswa Status Kritis (SP 2 & SP 3) */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs flex items-center justify-between card-hover-lift">
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status SP 2 & 3</p>
             <h3 className="text-2xl font-bold font-heading text-red-600 mt-1">{stats.siswaKritis}</h3>
