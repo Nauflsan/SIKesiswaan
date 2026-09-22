@@ -177,3 +177,71 @@ export function formatRomawi(bulanNumber) {
   const idx = Math.max(1, Math.min(12, Number(bulanNumber) || 1)) - 1;
   return ROMAWI_BULAN[idx] || 'I';
 }
+
+/**
+ * UTILITAS: Menghitung rentang tanggal (YYYY-MM-DD) berdasarkan preset periode
+ * dan bulan mulai tahun ajaran dinamis (default Juli / 7).
+ *
+ * @param {'bulan_ini' | 'semester_ganjil' | 'semester_genap' | 'tahun_ajaran_ini'} tipe
+ * @param {number} [bulanMulai=7] - Bulan mulai tahun ajaran (1-12, default 7)
+ * @param {Date} [refDate=new Date()] - Tanggal acuan
+ * @returns {{ tanggalMulai: string, tanggalSelesai: string, label: string }}
+ */
+export function getRentangPeriodePreset(tipe, bulanMulai = 7, refDate = new Date()) {
+  const formatYmd = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const currYear = refDate.getFullYear();
+  const currMonth = refDate.getMonth() + 1; // 1-12
+  const bm = Math.max(1, Math.min(12, Number(bulanMulai) || 7));
+
+  // Tentukan tahun kalender dimulainya tahun ajaran aktif saat ini
+  const tahunMulai = currMonth >= bm ? currYear : currYear - 1;
+  const tahunSelesai = tahunMulai + 1;
+  const labelTahunAjaran = `${tahunMulai}/${tahunSelesai}`;
+
+  if (tipe === 'bulan_ini') {
+    const dStart = new Date(currYear, currMonth - 1, 1);
+    const dEnd = new Date(currYear, currMonth, 0);
+    return {
+      tanggalMulai: formatYmd(dStart),
+      tanggalSelesai: formatYmd(dEnd),
+      label: `Bulan Ini (${dStart.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })})`
+    };
+  }
+
+  // Semester Ganjil (6 bulan pertama sejak bulanMulai)
+  const dGanjilStart = new Date(tahunMulai, bm - 1, 1);
+  const dGanjilEnd = new Date(tahunMulai, bm + 5, 0);
+
+  if (tipe === 'semester_ganjil') {
+    return {
+      tanggalMulai: formatYmd(dGanjilStart),
+      tanggalSelesai: formatYmd(dGanjilEnd),
+      label: `Semester Ganjil TA ${labelTahunAjaran}`
+    };
+  }
+
+  // Semester Genap (6 bulan berikutnya)
+  const dGenapStart = new Date(tahunMulai, bm + 5, 1);
+  const dGenapEnd = new Date(tahunMulai, bm + 11, 0);
+
+  if (tipe === 'semester_genap') {
+    return {
+      tanggalMulai: formatYmd(dGenapStart),
+      tanggalSelesai: formatYmd(dGenapEnd),
+      label: `Semester Genap TA ${labelTahunAjaran}`
+    };
+  }
+
+  // Default: 'tahun_ajaran_ini'
+  return {
+    tanggalMulai: formatYmd(dGanjilStart),
+    tanggalSelesai: formatYmd(dGenapEnd),
+    label: `Tahun Ajaran ${labelTahunAjaran}`
+  };
+}

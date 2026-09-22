@@ -50,10 +50,13 @@
     visibility: hidden;
   }
   #printable-surat-content,
-  #printable-surat-content * {
+  #printable-surat-content *,
+  #printable-rekap-content,
+  #printable-rekap-content * {
     visibility: visible;
   }
-  #printable-surat-content {
+  #printable-surat-content,
+  #printable-rekap-content {
     position: absolute;
     left: 0;
     top: 0;

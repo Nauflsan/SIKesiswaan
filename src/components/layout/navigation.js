@@ -13,7 +13,8 @@ import {
   FileText,
   History,
   Settings,
-  UserCog
+  UserCog,
+  BarChart3
 } from 'lucide-preact';
 
 export const navigation = [
@@ -21,6 +22,7 @@ export const navigation = [
   { name: 'Data Kasus', shortName: 'Kasus', href: '/kasus', icon: AlertTriangle, tab: true },
   { name: 'Daftar Siswa', shortName: 'Siswa', href: '/siswa', icon: Users, tab: true },
   { name: 'Kategori Pelanggaran', href: '/kategori', icon: Tag, roles: ['admin', 'guru_bk'] },
+  { name: 'Rekapitulasi & Laporan', shortName: 'Rekap', href: '/rekap', icon: BarChart3, roles: ['admin', 'guru_bk'] },
   { name: 'Import Data Excel', href: '/import', icon: FileSpreadsheet, roles: ['admin', 'guru_bk'] },
   { name: 'Surat Peringatan (SP)', shortName: 'Surat', href: '/surat', icon: FileText, roles: ['admin', 'guru_bk'], tab: true },
   { name: 'Log Aktivitas', href: '/log', icon: History, roles: ['admin', 'guru_bk'] },

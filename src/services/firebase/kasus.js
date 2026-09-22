@@ -84,6 +84,38 @@ export const firebaseKasusService = {
   },
 
   /**
+   * Mengambil riwayat kasus berdasarkan rentang tanggal (level query Firestore).
+   * Menjaga kuota read Spark dengan HANYA mengambil dokumen dalam periode terkait.
+   *
+   * @param {Object} params
+   * @param {string} params.tanggalMulai - Format YYYY-MM-DD
+   * @param {string} params.tanggalSelesai - Format YYYY-MM-DD
+   * @param {boolean} [params.includeDeleted=false]
+   * @returns {Promise<Array>}
+   */
+  getByPeriode: async ({ tanggalMulai, tanggalSelesai, includeDeleted = false } = {}) => {
+    if (!tanggalMulai || !tanggalSelesai) {
+      throw new Error('Parameter tanggalMulai dan tanggalSelesai wajib diisi');
+    }
+
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('tanggal', '>=', tanggalMulai),
+      where('tanggal', '<=', tanggalSelesai),
+      orderBy('tanggal', 'desc')
+    );
+
+    const snap = await getDocs(q);
+    let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    if (!includeDeleted) {
+      list = list.filter(k => !k.deletedAt);
+    }
+
+    return list;
+  },
+
+  /**
    * Mengambil detail satu kasus berdasarkan ID
    */
   getById: async (id) => {

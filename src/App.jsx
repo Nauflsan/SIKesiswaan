@@ -13,6 +13,7 @@ import SiswaDetail from './pages/SiswaDetail.jsx';
 import Kategori from './pages/Kategori.jsx';
 import ImportExcel from './pages/ImportExcel.jsx';
 import Surat from './pages/Surat.jsx';
+import Rekap from './pages/Rekap.jsx';
 import Log from './pages/Log.jsx';
 import Settings from './pages/Settings.jsx';
 import Akun from './pages/Akun.jsx';
@@ -84,6 +85,7 @@ export default function App() {
           <Route path="/kategori" component={Kategori} />
           <Route path="/import" component={ImportExcel} />
           <Route path="/surat" component={Surat} />
+          <Route path="/rekap">{only(['admin', 'guru_bk'], Rekap)}</Route>
           <Route path="/log" component={Log} />
           <Route path="/settings">{only(['admin'], Settings)}</Route>
           <Route path="/akun" component={Akun} />
