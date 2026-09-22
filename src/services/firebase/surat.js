@@ -11,7 +11,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  updateDoc,
   runTransaction,
   query,
   orderBy
@@ -40,6 +39,24 @@ export const firebaseSuratService = {
     }
 
     return list;
+  },
+
+  /**
+   * Mengambil riwayat surat peringatan milik satu siswa tertentu (Query Firestore langsung).
+   * Mencegah full-scan koleksi surat saat membuka profil siswa di SiswaDetail.
+   *
+   * @param {string} siswaId
+   * @returns {Promise<Array>}
+   */
+  getBySiswaId: async (siswaId) => {
+    if (!siswaId) return [];
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('siswaId', '==', siswaId)
+    );
+    const snap = await getDocs(q);
+    let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   },
 
   /**
@@ -132,22 +149,5 @@ export const firebaseSuratService = {
     });
 
     return newSurat;
-  },
-
-  /**
-   * Memperbarui status surat (misal: dari draft menjadi dicetak)
-   */
-  update: async (id, data, currentUser) => {
-    const docRef = doc(db, COLLECTION_NAME, id);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) throw new Error('Surat tidak ditemukan');
-
-    const updateData = {
-      ...data,
-      updatedAt: new Date().toISOString()
-    };
-
-    await updateDoc(docRef, updateData);
-    return { id, ...snap.data(), ...updateData };
   }
 };

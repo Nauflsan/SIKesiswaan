@@ -92,8 +92,8 @@ export default function SiswaDetail() {
     try {
       const [siswaData, kasusData, suratData, settingsData] = await Promise.all([
         siswaService.getById(siswaId),
-        kasusService.getAll({ siswaId, includeDeleted: true }),
-        suratService.getAll({ siswaId }),
+        kasusService.getBySiswaId(siswaId, { includeDeleted: true }),
+        suratService.getBySiswaId(siswaId),
         settingsService.get()
       ]);
 

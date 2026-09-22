@@ -20,7 +20,7 @@
  * =============================================================================
  */
 
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import { Link } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
@@ -48,7 +48,7 @@ export default function Kasus() {
   const { showToast } = useUIStore();
 
   // State penyimpanan data dari API / Service
-  const [kasusList, setKasusList] = useState([]);
+  const [rawKasusList, setRawKasusList] = useState([]);
   const [kategoriList, setKategoriList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -63,23 +63,16 @@ export default function Kasus() {
   const [activeKasusModal, setActiveKasusModal] = useState(null);
   const [deleteConfirmKasus, setDeleteConfirmKasus] = useState(null);
 
-  // Daftar opsi kelas dinamis yang diekstrak dari master data siswa
-  const [distinctKelas, setDistinctKelas] = useState([
-    'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
-    'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
-    'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2'
-  ]);
-
   /**
-   * Hook pemuatan data: Berjalan saat komponen dipasang atau saat filter berubah.
+   * Hook pemuatan data: Berjalan HANYA 1x saat komponen dipasang (mount).
+   * Perubahan filter dropdown ditangani secara in-memory (useMemo) untuk menghemat kuota Firestore.
    */
   useEffect(() => {
     loadData();
-  }, [user, selectedKelas, selectedKategori, selectedStatus]);
+  }, []);
 
   /**
-   * Mengambil data kasus, kategori, dan siswa dari service layer.
-   * Parameter query filter dikirim ke service Firestore.
+   * Mengambil data kasus dan kategori dari service layer.
    */
   async function loadData() {
     setLoading(true);
@@ -87,26 +80,10 @@ export default function Kasus() {
     try {
       const [kategoriData, data] = await Promise.all([
         kategoriService.getAll(),
-        kasusService.getAll({
-          kelas: selectedKelas !== 'semua' ? selectedKelas : undefined,
-          kategoriId: selectedKategori !== 'semua' ? selectedKategori : undefined,
-          status: selectedStatus !== 'semua' ? selectedStatus : undefined,
-          search: search.trim() || undefined
-        })
+        kasusService.getAll()
       ]);
       setKategoriList(kategoriData);
-      setKasusList(data);
-
-      // Kumpulkan semua kelas unik dari daftar preset dan kasus yang ada untuk opsi dropdown filter
-      const uniqueClasses = Array.from(
-        new Set([
-          'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
-          'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
-          'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2',
-          ...data.map(k => k.siswaKelas).filter(Boolean)
-        ])
-      ).sort();
-      setDistinctKelas(uniqueClasses);
+      setRawKasusList(data);
     } catch (err) {
       const msg = friendlyError(err, 'Gagal memuat data kasus');
       setLoadError(msg);
@@ -116,23 +93,56 @@ export default function Kasus() {
     }
   }
 
+  // Daftar opsi kelas dinamis yang diekstrak dari master data kasus
+  const distinctKelas = useMemo(() => Array.from(
+    new Set([
+      'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
+      'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
+      'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2',
+      ...rawKasusList.map(k => k.siswaKelas).filter(Boolean)
+    ])
+  ).sort(), [rawKasusList]);
+
+  // Filter in-memory: nol query Firestore tambahan saat filter atau search berubah
+  const kasusList = useMemo(() => {
+    let list = rawKasusList;
+    if (selectedKelas !== 'semua') {
+      list = list.filter(k => k.siswaKelas === selectedKelas);
+    }
+    if (selectedKategori !== 'semua') {
+      list = list.filter(k => k.kategoriId === selectedKategori);
+    }
+    if (selectedStatus !== 'semua') {
+      list = list.filter(k => k.status === selectedStatus);
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(k =>
+        (k.siswaNama && k.siswaNama.toLowerCase().includes(q)) ||
+        (k.siswaNisn && k.siswaNisn.includes(q)) ||
+        (k.kategoriNama && k.kategoriNama.toLowerCase().includes(q)) ||
+        (k.deskripsi && k.deskripsi.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [rawKasusList, selectedKelas, selectedKategori, selectedStatus, search]);
+
   /**
-   * Handler submit form pencarian teks
+   * Handler submit form pencarian teks (in-memory, tidak perlu refetch)
    */
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    loadData();
   };
 
   /**
    * Handler perubahan status pembinaan ('baru' -> 'ditangani' -> 'selesai')
-   * Mencatat jejak audit (updatedAt) dan memperbarui tampilan modal jika sedang terbuka.
+   * Memperbarui state lokal seketika tanpa melakukan full-read Firestore ulang.
    */
   const handleStatusChange = async (kasusId, newStatus) => {
     try {
       await kasusService.update(kasusId, { status: newStatus }, user);
       showToast(`Status berhasil diubah menjadi ${newStatus}`, 'success');
-      loadData();
+      setRawKasusList(prev => prev.map(k => k.id === kasusId ? { ...k, status: newStatus } : k));
       if (activeKasusModal && activeKasusModal.id === kasusId) {
         setActiveKasusModal(prev => ({ ...prev, status: newStatus }));
       }
@@ -143,17 +153,16 @@ export default function Kasus() {
 
   /**
    * Handler soft-delete kasus pelanggaran:
-   * Hanya diizinkan untuk Admin.
-   * Mengurangi poin siswa secara otomatis di layer database/service.
+   * Memperbarui state lokal seketika tanpa melakukan full-read Firestore ulang.
    */
   const handleDeleteKasus = async () => {
     if (!deleteConfirmKasus) return;
     try {
       await kasusService.delete(deleteConfirmKasus.id, user);
       showToast('Kasus berhasil dihapus (soft delete) dan poin siswa telah dikurangi otomatis', 'success');
+      setRawKasusList(prev => prev.filter(k => k.id !== deleteConfirmKasus.id));
       setDeleteConfirmKasus(null);
       if (activeKasusModal?.id === deleteConfirmKasus.id) setActiveKasusModal(null);
-      loadData();
     } catch (err) {
       showToast(err.message || 'Gagal menghapus kasus', 'error');
     }

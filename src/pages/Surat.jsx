@@ -112,7 +112,7 @@ export default function Surat() {
       setSelectedKasusIds([]);
       return;
     }
-    kasusService.getAll({ siswaId: selectedSiswaId }).then(data => {
+    kasusService.getBySiswaId(selectedSiswaId).then(data => {
       setStudentKasus(data);
       setSelectedKasusIds(data.map(k => k.id)); // Secara default pilih semua kasus aktif
     });
@@ -131,7 +131,7 @@ export default function Surat() {
       setPreviewKasusList([]);
       return;
     }
-    kasusService.getAll({ siswaId: previewSurat.siswaId }).then((data) => {
+    kasusService.getBySiswaId(previewSurat.siswaId, { includeDeleted: true }).then((data) => {
       setPreviewKasusList(data.filter(k => ids.includes(k.id)));
     }).catch(() => {
       setPreviewKasusList([]);

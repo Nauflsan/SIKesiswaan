@@ -21,10 +21,11 @@ import {
   runTransaction,
   query,
   where,
-  orderBy
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { hitungStatusSP } from '../../lib/helpers.js';
-import { firebaseSettingsService, defaultSchoolSettings } from './settings.js';
+import { defaultSchoolSettings } from './settings.js';
 import { firebaseLogService } from './log.js';
 
 const COLLECTION_NAME = 'kasus';
@@ -270,30 +271,62 @@ export const firebaseKasusService = {
   },
 
   /**
-   * Alat perbaikan: menghitung ulang total poin siswa dari seluruh kasus aktifnya
-   * (tidak dipakai alur normal; berguna bila data poin pernah tidak sinkron).
+   * Mengambil riwayat kasus milik satu siswa tertentu berdasarkan ID (Query Firestore langsung).
+   * Mencegah full-scan koleksi kasus saat membuka detail siswa atau membuat surat.
+   *
+   * @param {string} siswaId - ID dokumen siswa
+   * @param {Object} [options]
+   * @param {boolean} [options.includeDeleted=false]
+   * @returns {Promise<Array>}
    */
-  recalculateSiswaPoints: async (siswaId) => {
+  getBySiswaId: async (siswaId, { includeDeleted = false } = {}) => {
+    if (!siswaId) return [];
     const q = query(
       collection(db, COLLECTION_NAME),
       where('siswaId', '==', siswaId)
     );
     const snap = await getDocs(q);
-    const activeKasus = snap.docs
-      .map(d => d.data())
+    let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!includeDeleted) {
+      list = list.filter(k => !k.deletedAt);
+    }
+    return list.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+  },
+
+  /**
+   * Mengambil kasus berdasarkan status tertentu (misal: 'baru' untuk dashboard).
+   *
+   * @param {string} status - 'baru' | 'dalam_pembinaan' | 'selesai'
+   * @returns {Promise<Array>}
+   */
+  getByStatus: async (status = 'baru') => {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('status', '==', status)
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
       .filter(k => !k.deletedAt);
+  },
 
-    const totalPoin = activeKasus.reduce((sum, k) => sum + Number(k.poin || 0), 0);
-    const settings = await firebaseSettingsService.get();
-    const statusSP = hitungStatusSP(totalPoin, settings);
-
-    const siswaRef = doc(db, 'siswa', siswaId);
-    await updateDoc(siswaRef, {
-      totalPoin,
-      statusSP,
-      updatedAt: new Date().toISOString()
-    });
-
-    return { totalPoin, statusSP };
+  /**
+   * Mengambil N kasus terbaru yang aktif (dipakai ringkasan Dashboard).
+   * Menggunakan limit() Firestore agar tidak menarik seluruh data historis.
+   *
+   * @param {number} [limitCount=5]
+   * @returns {Promise<Array>}
+   */
+  getRecent: async (limitCount = 5) => {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      orderBy('tanggal', 'desc'),
+      limit(limitCount + 3)
+    );
+    const snap = await getDocs(q);
+    const list = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(k => !k.deletedAt);
+    return list.slice(0, limitCount);
   }
 };

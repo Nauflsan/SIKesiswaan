@@ -126,24 +126,6 @@ export function formatWaktu(timestamp) {
 }
 
 /**
- * LOGIKA: Menentukan tahun ajaran (format "YYYY/YYYY+1") dari sebuah tanggal.
- * Dihitung on-the-fly berdasarkan bulan mulai tahun ajaran di Pengaturan,
- * BUKAN field tersimpan — supaya aman kalau bulan mulai diubah admin nanti.
- *
- * @param {string} tanggalStr - Tanggal kasus/kejadian (YYYY-MM-DD)
- * @param {number} bulanMulai - Bulan mulai tahun ajaran (1-12, default Juli)
- * @returns {string} Contoh: "2026/2027"
- */
-export function hitungTahunAjaran(tanggalStr, bulanMulai = 7) {
-  const d = new Date(tanggalStr);
-  if (isNaN(d.getTime())) return '-';
-  const bulan = d.getMonth() + 1;
-  const tahun = d.getFullYear();
-  const mulai = bulan >= bulanMulai ? tahun : tahun - 1;
-  return `${mulai}/${mulai + 1}`;
-}
-
-/**
  * TAMPILAN: Menghasilkan label teks dan kelas warna Tailwind untuk badge status keaktifan siswa.
  *
  * @param {'aktif' | 'lulus' | 'pindah' | 'keluar'} statusSiswa

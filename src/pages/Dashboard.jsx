@@ -55,60 +55,57 @@ export default function Dashboard() {
   }, []);
 
   /**
-   * LOGIKA PENGAMBILAN & AGREGASI DATA DASHBOARD
+   * LOGIKA PENGAMBILAN & AGREGASI DATA DASHBOARD (HEMAT KUOTA)
+   * Menghindari full-scan koleksi kasus yang terus membesar seiring waktu.
    */
   async function loadDashboardData() {
     setLoading(true);
     setLoadError(null);
     try {
-      // Ambil data kasus, siswa, dan kategori secara paralel
-      const [allKasus, allSiswa, allKategori] = await Promise.all([
-        kasusService.getAll(),
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+      // Ambil data teroptimasi: server-side range, status 'baru', limit(5)
+      const [kasusBulanIni, belumDitanganiList, recentList, allSiswa, allKategori] = await Promise.all([
+        kasusService.getByPeriode({ tanggalMulai: startDate, tanggalSelesai: endDate }),
+        kasusService.getByStatus('baru'),
+        kasusService.getRecent(5),
         siswaService.getAll(),
         kategoriService.getAll()
       ]);
 
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-
-      // 3. Hitung kasus yang terjadi pada bulan berjalan
-      const kasusBulanIni = allKasus.filter(k => {
-        const d = new Date(k.tanggal);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-      });
-
-      // 4. Hitung kasus yang statusnya masih 'baru' (belum ditindaklanjuti)
-      const belumDitangani = allKasus.filter(k => k.status === 'baru');
-
-      // 5. Hitung siswa berstatus SP 1 (Peringatan awal)
+      // 1. Hitung siswa berstatus SP 1 (Peringatan awal)
       const siswaSP1 = allSiswa.filter(s => s.statusSP === 'sp1');
 
-      // 6. Hitung siswa berstatus SP 2 atau SP 3 (Zona kritis/terancam DO)
+      // 2. Hitung siswa berstatus SP 2 atau SP 3 (Zona kritis/terancam DO)
       const siswaKritis = allSiswa.filter(s => s.statusSP === 'sp2' || s.statusSP === 'sp3');
 
       setStats({
         totalKasusBulanIni: kasusBulanIni.length,
-        belumDitangani: belumDitangani.length,
+        belumDitangani: belumDitanganiList.length,
         siswaSP1: siswaSP1.length,
         siswaKritis: siswaKritis.length
       });
 
-      // 7. Ambil 5 siswa dengan total poin tertinggi (diurutkan descending)
+      // 3. Ambil 5 siswa dengan total poin tertinggi
       const sortedSiswa = [...allSiswa]
         .filter(s => s.totalPoin > 0)
         .sort((a, b) => b.totalPoin - a.totalPoin)
         .slice(0, 5);
       setTopSiswa(sortedSiswa);
 
-      // 8. Ambil 5 catatan pelanggaran paling baru
-      setRecentKasus(allKasus.slice(0, 5));
+      // 4. 5 catatan pelanggaran paling baru
+      setRecentKasus(recentList);
 
-      // 9. Hitung frekuensi kejadian per kategori untuk visualisasi bar chart
+      // 5. Hitung frekuensi kejadian per kategori bulan ini
       const counts = allKategori.map(kat => {
-        const count = allKasus.filter(k => k.kategoriId === kat.id).length;
+        const count = kasusBulanIni.filter(k => k.kategoriId === kat.id).length;
         return { nama: kat.nama, count, poin: kat.poin };
-      }).sort((a, b) => b.count - a.count).slice(0, 6);
+      }).filter(item => item.count > 0).sort((a, b) => b.count - a.count).slice(0, 6);
 
       setKategoriStats(counts);
     } catch (err) {

@@ -195,7 +195,7 @@ export default function Login() {
             <span>Mode Cloud Firebase Aktif</span>
           </div>
           <p className="text-[11px] text-blue-800/80 leading-relaxed">
-            Terhubung ke project <b>sikesiswaan-dev</b>. Masuk menggunakan email dan kata sandi akun Firebase yang telah terdaftar.
+            Terhubung ke project <b>{import.meta.env.VITE_FIREBASE_PROJECT_ID || 'sikesiswaan-dev'}</b>. Masuk menggunakan email dan kata sandi akun Firebase yang telah terdaftar.
           </p>
         </div>
       </div>

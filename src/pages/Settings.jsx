@@ -906,7 +906,7 @@ export default function Settings() {
                   Project ID
                 </span>
                 <span className="font-mono font-bold text-gray-800">
-                  sikesiswaan-dev
+                  {import.meta.env.VITE_FIREBASE_PROJECT_ID || 'sikesiswaan-dev'}
                 </span>
               </div>
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">

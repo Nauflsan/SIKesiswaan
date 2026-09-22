@@ -66,7 +66,7 @@ export default function KasusForm() {
     setLoading(true);
     try {
       const [siswaData, kategoriData, settingsData] = await Promise.all([
-        siswaService.getAll(),
+        siswaService.getAll({ statusSiswa: 'aktif' }),
         kategoriService.getAll(),
         settingsService.get()
       ]);
