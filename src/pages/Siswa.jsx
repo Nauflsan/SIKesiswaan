@@ -24,6 +24,7 @@ import { Link } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { SPBadge, StatusSiswaBadge } from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
+import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import { siswaService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
@@ -52,8 +53,6 @@ export default function Siswa() {
 
   // State modal penambahan siswa baru
   const [showAddModal, setShowAddModal] = useState(false);
-  const [isCustomKelas, setIsCustomKelas] = useState(false); // Toggle input kelas manual vs select
-  const [customKelasInput, setCustomKelasInput] = useState('');
   const [newSiswa, setNewSiswa] = useState({
     nisn: '',
     nama: '',
@@ -61,6 +60,7 @@ export default function Siswa() {
     jurusan: 'Teknik Komputer dan Jaringan',
     angkatan: 2024
   });
+  const [submitting, setSubmitting] = useState(false);
 
   /**
    * Mengambil seluruh daftar siswa dari Firestore SATU KALI saat komponen dimuat.
@@ -127,25 +127,40 @@ export default function Siswa() {
    */
   const handleAddSiswa = async (e) => {
     e.preventDefault();
-    const finalKelas = isCustomKelas ? customKelasInput.trim() : newSiswa.kelas;
+    const finalKelas = (newSiswa.kelas || '').trim();
     if (!finalKelas) {
       showToast('Harap pilih atau masukkan nama kelas', 'error');
       return;
     }
 
+    const trimmedNisn = (newSiswa.nisn || '').trim();
+    if (!trimmedNisn) {
+      showToast('NISN tidak boleh kosong', 'error');
+      return;
+    }
+
+    // Validasi in-memory (0 read Firestore): Cek apakah NISN sudah terdaftar pada siswa aktif
+    const duplicate = rawSiswaList.find(s => s.nisn?.trim() === trimmedNisn);
+    if (duplicate) {
+      showToast(`NISN ${trimmedNisn} sudah terdaftar atas nama ${duplicate.nama} (${duplicate.kelas})`, 'error');
+      return;
+    }
+
+    setSubmitting(true);
     try {
       await siswaService.create({
         ...newSiswa,
+        nisn: trimmedNisn,
         kelas: finalKelas
       }, user);
       showToast(`Siswa ${newSiswa.nama} (${finalKelas}) berhasil didaftarkan!`, 'success');
       setShowAddModal(false);
       setNewSiswa({ nisn: '', nama: '', kelas: finalKelas, jurusan: 'Teknik Komputer dan Jaringan', angkatan: 2024 });
-      setIsCustomKelas(false);
-      setCustomKelasInput('');
       loadSiswa();
     } catch (err) {
       showToast(err.message || 'Gagal menambahkan siswa', 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -193,16 +208,14 @@ export default function Siswa() {
           <span>Filter:</span>
         </div>
 
-        <select
+        <CreatableCombobox
           value={selectedKelas}
-          onChange={(e) => setSelectedKelas(e.target.value)}
-          className="text-xs py-1.5 px-3 bg-gray-50 border border-gray-200 rounded-lg font-medium cursor-pointer"
-        >
-          <option value="semua">Semua Kelas</option>
-          {distinctKelas.map(k => (
-            <option key={k} value={k}>{k}</option>
-          ))}
-        </select>
+          onChange={setSelectedKelas}
+          options={distinctKelas}
+          allOptionLabel="Semua Kelas"
+          allOptionValue="semua"
+          variant="pill"
+        />
 
         <select
           value={selectedStatusSP}
@@ -332,39 +345,16 @@ export default function Siswa() {
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-600">
-                  Kelas Siswa <span className="text-red-500">*</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setIsCustomKelas(!isCustomKelas)}
-                  className="text-[11px] font-semibold text-[#4A6FA5] hover:underline"
-                >
-                  {isCustomKelas ? '← Pilih dari daftar kelas' : '+ Ketik kelas baru'}
-                </button>
-              </div>
-
-              {!isCustomKelas ? (
-                <select
-                  value={newSiswa.kelas}
-                  onChange={(e) => setNewSiswa({ ...newSiswa, kelas: e.target.value })}
-                  className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl font-medium"
-                >
-                  {distinctKelas.map(k => (
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  required
-                  placeholder="Ketik nama kelas baru (contoh: X TKJ 3, XI MM 1)"
-                  value={customKelasInput}
-                  onInput={(e) => setCustomKelasInput(e.target.value)}
-                  className="w-full text-sm py-2 px-3 bg-gray-50 border border-[#4A6FA5] rounded-xl focus:ring-1 focus:ring-[#4A6FA5]"
-                />
-              )}
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+                Kelas Siswa <span className="text-red-500">*</span>
+              </label>
+              <CreatableCombobox
+                value={newSiswa.kelas}
+                onChange={(val) => setNewSiswa({ ...newSiswa, kelas: val })}
+                options={distinctKelas}
+                placeholder="Pilih atau ketik kelas baru..."
+                creatable={true}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -402,16 +392,18 @@ export default function Siswa() {
             <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl"
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-bold rounded-xl shadow-xs"
+                disabled={submitting}
+                className="px-5 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-bold rounded-xl shadow-xs disabled:opacity-50"
               >
-                Simpan Siswa
+                {submitting ? 'Menyimpan...' : 'Simpan Siswa'}
               </button>
             </div>
           </form>

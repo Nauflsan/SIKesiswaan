@@ -3,6 +3,7 @@ import { Link, useLocation } from 'wouter-preact';
 import { MoreHorizontal, LogOut } from 'lucide-preact';
 import { useAuthStore } from '../../stores/authStore.js';
 import { navigation, canAccess, isActivePath } from './navigation.js';
+import AboutModal from '../ui/AboutModal.jsx';
 
 /**
  * Navigasi bawah untuk layar kecil (HP). Menampilkan tab utama; menu lainnya,
@@ -12,6 +13,7 @@ export default function BottomNav() {
   const [location] = useLocation();
   const { user, logout } = useAuthStore();
   const [showMore, setShowMore] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   const allowed = navigation.filter(item => canAccess(item, user));
   const tabs = allowed.filter(item => item.tab);
@@ -109,9 +111,26 @@ export default function BottomNav() {
               <LogOut className="w-5 h-5" />
               <span>Keluar Akun</span>
             </button>
+
+            {/* Versi & Tentang Sistem */}
+            <div className="mt-3 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMore(false);
+                  setShowAbout(true);
+                }}
+                className="text-[11px] text-gray-400 hover:text-[#4A6FA5] font-medium transition-colors cursor-pointer py-1"
+              >
+                SIK-Kharisma v1.0.0 • Tentang Sistem
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Modal Tentang Sistem untuk Mobile */}
+      <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
     </>
   );
 }

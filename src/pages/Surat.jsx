@@ -22,9 +22,10 @@
  * =============================================================================
  */
 
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import Modal from '../components/ui/Modal.jsx';
+import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import { suratService, siswaService, kasusService, settingsService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
@@ -56,6 +57,15 @@ export default function Surat() {
   const [studentKasus, setStudentKasus] = useState([]);
   const [selectedKasusIds, setSelectedKasusIds] = useState([]);
   const [generating, setGenerating] = useState(false);
+
+  // Opsi dropdown pemilihan siswa terstruktur untuk combobox pencarian
+  const siswaOptions = useMemo(() => {
+    return siswaList.map(s => ({
+      value: s.id,
+      label: s.nama,
+      sublabel: `${s.kelas} • ${s.totalPoin} Poin • Status ${s.statusSP.toUpperCase()}`
+    }));
+  }, [siswaList]);
 
   // State Pratinjau Lembar Surat Resmi untuk Cetak
   const [previewSurat, setPreviewSurat] = useState(null);
@@ -288,19 +298,14 @@ export default function Surat() {
               <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
                 Pilih Siswa Penerima Surat <span className="text-red-500">*</span>
               </label>
-              <select
+              <CreatableCombobox
                 value={selectedSiswaId}
-                onChange={(e) => setSelectedSiswaId(e.target.value)}
-                required
-                className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl"
-              >
-                <option value="">-- Pilih Siswa --</option>
-                {siswaList.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.nama} ({s.kelas} • {s.totalPoin} Poin • {s.statusSP.toUpperCase()})
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedSiswaId(val)}
+                options={siswaOptions}
+                placeholder="-- Pilih atau cari siswa penerima surat --"
+                searchPlaceholder="Cari berdasarkan nama siswa atau rombel kelas..."
+                creatable={false}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

@@ -25,6 +25,7 @@ import { Link } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
+import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import { kasusService, kategoriService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
@@ -207,16 +208,14 @@ export default function Kasus() {
         </div>
 
         {/* Kelas Filter */}
-        <select
+        <CreatableCombobox
           value={selectedKelas}
-          onChange={(e) => setSelectedKelas(e.target.value)}
-          className="text-xs py-1.5 px-3 bg-gray-50 border border-gray-200 rounded-lg font-medium focus:ring-1 focus:ring-[#4A6FA5] cursor-pointer"
-        >
-          <option value="semua">Semua Kelas</option>
-          {distinctKelas.map(k => (
-            <option key={k} value={k}>{k}</option>
-          ))}
-        </select>
+          onChange={setSelectedKelas}
+          options={distinctKelas}
+          allOptionLabel="Semua Kelas"
+          allOptionValue="semua"
+          variant="pill"
+        />
 
         {/* Kategori Filter */}
         <select

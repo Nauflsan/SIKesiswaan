@@ -16,6 +16,7 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import Modal from '../components/ui/Modal.jsx';
+import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import LoadError from '../components/ui/LoadError.jsx';
 import { KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
 import { kasusService, kategoriService, settingsService } from '../services/index.js';
@@ -556,16 +557,14 @@ export default function Rekap() {
             <span>Saring:</span>
           </div>
 
-          <select
+          <CreatableCombobox
             value={selectedKelas}
-            onChange={(e) => setSelectedKelas(e.target.value)}
-            className="py-1 px-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium cursor-pointer"
-          >
-            <option value="semua">Semua Kelas</option>
-            {distinctKelas.map(k => (
-              <option key={k} value={k}>{k}</option>
-            ))}
-          </select>
+            onChange={setSelectedKelas}
+            options={distinctKelas}
+            allOptionLabel="Semua Kelas"
+            allOptionValue="semua"
+            variant="pill"
+          />
 
           <select
             value={selectedKategori}
