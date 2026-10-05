@@ -21,6 +21,7 @@
 
 import { useState, useEffect } from 'preact/hooks';
 import AppLayout from '../components/layout/AppLayout.jsx';
+import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import { PoinBadge } from '../components/ui/Badge.jsx';
 import { kategoriService, settingsService } from '../services/index.js';
@@ -367,18 +368,13 @@ export default function Kategori() {
                 <label className="block font-bold text-gray-700 mb-1">
                   Bulan Mulai Tahun Ajaran
                 </label>
-                <select
-                  disabled={!isAdmin}
+                <CreatableCombobox
                   value={bulanMulai}
-                  onChange={(e) => setBulanMulai(Number(e.target.value))}
-                  className={`w-full py-2 px-3 border border-gray-200 rounded-xl font-bold ${
-                    !isAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 text-gray-700 focus:ring-1 focus:ring-[#4A6FA5]'
-                  }`}
-                >
-                  {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((nama, idx) => (
-                    <option key={idx} value={idx + 1}>{nama}</option>
-                  ))}
-                </select>
+                  disabled={!isAdmin}
+                  onChange={(val) => setBulanMulai(Number(val))}
+                  options={['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+                    .map((nama, idx) => ({ value: idx + 1, label: nama }))}
+                />
                 <p className="text-[11px] text-gray-400 mt-1">
                   Menentukan label tahun ajaran (mis. "2026/2027") pada rekap & surat. Aman diubah kapan saja dihitung ulang otomatis dari tanggal kasus.
                 </p>

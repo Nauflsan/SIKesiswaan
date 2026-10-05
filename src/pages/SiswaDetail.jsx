@@ -19,6 +19,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { Link, useRoute } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
+import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import { SPBadge, KasusStatusBadge, PoinBadge, StatusSiswaBadge } from '../components/ui/Badge.jsx';
 import { siswaService, kasusService, suratService, settingsService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
@@ -149,17 +150,18 @@ export default function SiswaDetail() {
                 <h2 className="text-xl font-bold font-heading text-gray-900">{siswa.nama}</h2>
                 <SPBadge status={siswa.statusSP} />
                 {canEditStatus ? (
-                  <select
+                  <CreatableCombobox
                     value={siswa.statusSiswa || 'aktif'}
                     disabled={savingStatus}
-                    onChange={(e) => handleChangeStatusSiswa(e.target.value)}
-                    className="text-xs py-1 px-2 bg-gray-50 border border-gray-200 rounded-lg font-semibold cursor-pointer disabled:opacity-50"
-                  >
-                    <option value="aktif">Aktif</option>
-                    <option value="lulus">Lulus</option>
-                    <option value="pindah">Pindah Sekolah</option>
-                    <option value="keluar">Keluar / DO</option>
-                  </select>
+                    onChange={handleChangeStatusSiswa}
+                    options={[
+                      { value: 'aktif', label: 'Aktif' },
+                      { value: 'lulus', label: 'Lulus' },
+                      { value: 'pindah', label: 'Pindah Sekolah' },
+                      { value: 'keluar', label: 'Keluar / DO' }
+                    ]}
+                    variant="pill"
+                  />
                 ) : (
                   siswa.statusSiswa && siswa.statusSiswa !== 'aktif' && (
                     <StatusSiswaBadge status={siswa.statusSiswa} />

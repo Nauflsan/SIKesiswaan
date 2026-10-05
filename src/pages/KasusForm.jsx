@@ -23,6 +23,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { useLocation } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
+import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import { SPBadge } from '../components/ui/Badge.jsx';
 import { siswaService, kategoriService, kasusService, settingsService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
@@ -105,8 +106,7 @@ export default function KasusForm() {
    * Handler saat kategori pelanggaran dipilih:
    * Mengisi otomatis bobot poin default sesuai kategori yang dipilih.
    */
-  const handleKategoriChange = (e) => {
-    const kId = e.target.value;
+  const handleKategoriChange = (kId) => {
     setSelectedKategoriId(kId);
     const found = kategoriList.find(k => k.id === kId);
     if (found) {
@@ -172,21 +172,15 @@ export default function KasusForm() {
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
                 Pilih Siswa Terlapor <span className="text-red-500">*</span>
               </label>
-              <select
+              <CreatableCombobox
                 value={selectedSiswaId}
-                onChange={(e) => setSelectedSiswaId(e.target.value)}
-                required
-                className="w-full text-sm py-2.5 px-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#4A6FA5]/20 focus:border-[#4A6FA5] font-medium"
-              >
-                <option value="">-- Pilih Nama Siswa / NISN --</option>
-                {siswaList
+                onChange={setSelectedSiswaId}
+                options={siswaList
                   .filter(s => (s.statusSiswa || 'aktif') === 'aktif' || s.id === selectedSiswaId)
-                  .map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.nama} ({s.kelas} • NISN: {s.nisn})
-                    </option>
-                  ))}
-              </select>
+                  .map(s => ({ value: s.id, label: s.nama, sublabel: `${s.kelas} • NISN: ${s.nisn}` }))}
+                placeholder="-- Pilih Nama Siswa / NISN --"
+                searchPlaceholder="Cari nama, kelas, atau NISN..."
+              />
             </div>
 
             {/* Kategori Pelanggaran */}
@@ -194,19 +188,13 @@ export default function KasusForm() {
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">
                 Jenis Pelanggaran <span className="text-red-500">*</span>
               </label>
-              <select
+              <CreatableCombobox
                 value={selectedKategoriId}
                 onChange={handleKategoriChange}
-                required
-                className="w-full text-sm py-2.5 px-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#4A6FA5]/20 focus:border-[#4A6FA5] font-medium"
-              >
-                <option value="">-- Pilih Jenis Pelanggaran --</option>
-                {kategoriList.map(k => (
-                  <option key={k.id} value={k.id}>
-                    {k.nama} (+{k.poin} Poin)
-                  </option>
-                ))}
-              </select>
+                options={kategoriList.map(k => ({ value: k.id, label: k.nama, sublabel: `+${k.poin} Poin` }))}
+                placeholder="-- Pilih Jenis Pelanggaran --"
+                searchPlaceholder="Cari jenis pelanggaran..."
+              />
             </div>
 
             {/* Tanggal & Poin Row */}

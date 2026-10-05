@@ -313,16 +313,16 @@ export default function Surat() {
                 <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
                   Jenis Surat <span className="text-red-500">*</span>
                 </label>
-                <select
+                <CreatableCombobox
                   value={jenisSurat}
-                  onChange={(e) => setJenisSurat(e.target.value)}
-                  className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl font-semibold"
-                >
-                  <option value="sp1">Surat Peringatan I (SP 1)</option>
-                  <option value="sp2">Surat Peringatan II (SP 2)</option>
-                  <option value="sp3">Surat Peringatan III (SP 3 / Terakhir)</option>
-                  <option value="panggilan_orang_tua">Surat Panggilan Orang Tua</option>
-                </select>
+                  onChange={setJenisSurat}
+                  options={[
+                    { value: 'sp1', label: 'Surat Peringatan I (SP 1)' },
+                    { value: 'sp2', label: 'Surat Peringatan II (SP 2)' },
+                    { value: 'sp3', label: 'Surat Peringatan III (SP 3 / Terakhir)' },
+                    { value: 'panggilan_orang_tua', label: 'Surat Panggilan Orang Tua' }
+                  ]}
+                />
               </div>
 
               <div>

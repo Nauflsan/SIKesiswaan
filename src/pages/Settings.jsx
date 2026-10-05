@@ -22,6 +22,7 @@
 import { useState, useEffect } from "preact/hooks";
 import { Link } from "wouter-preact";
 import AppLayout from "../components/layout/AppLayout.jsx";
+import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import Modal from "../components/ui/Modal.jsx";
 import { settingsService, authService } from "../services/index.js";
 import { friendlyError } from '../lib/errors.js';
@@ -698,17 +699,15 @@ export default function Settings() {
                   <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
                     Role Hak Akses <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <CreatableCombobox
                     value={editForm.role}
                     disabled={editingUser.id === user.id}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, role: e.target.value })
-                    }
-                    className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl font-semibold disabled:bg-gray-100 disabled:text-gray-500"
-                  >
-                    <option value="guru_bk">🎓 Guru Bimbingan Konseling (BK)</option>
-                    <option value="admin">👑 Administrator</option>
-                  </select>
+                    onChange={(val) => setEditForm({ ...editForm, role: val })}
+                    options={[
+                      { value: 'guru_bk', label: '🎓 Guru Bimbingan Konseling (BK)', sublabel: 'Mengelola Semua Kasus & Surat' },
+                      { value: 'admin', label: '👑 Administrator', sublabel: 'Akses Penuh Sistem & Kelola User' }
+                    ]}
+                  />
                   {editingUser.id === user.id && (
                     <p className="text-[10px] text-gray-400 mt-1">
                       Anda tidak dapat mengubah role akun Anda sendiri.
@@ -850,21 +849,14 @@ export default function Settings() {
                   <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
                     Role Hak Akses <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <CreatableCombobox
                     value={newUserForm.role}
-                    onChange={(e) =>
-                      setNewUserForm({ ...newUserForm, role: e.target.value })
-                    }
-                    className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl font-semibold"
-                  >
-                    <option value="guru_bk">
-                      🎓 Guru Bimbingan Konseling (BK) — Mengelola Semua Kasus &
-                      Surat
-                    </option>
-                    <option value="admin">
-                      👑 Administrator — Akses Penuh Sistem & Kelola User
-                    </option>
-                  </select>
+                    onChange={(val) => setNewUserForm({ ...newUserForm, role: val })}
+                    options={[
+                      { value: 'guru_bk', label: '🎓 Guru Bimbingan Konseling (BK)', sublabel: 'Mengelola Semua Kasus & Surat' },
+                      { value: 'admin', label: '👑 Administrator', sublabel: 'Akses Penuh Sistem & Kelola User' }
+                    ]}
+                  />
                 </div>
 
                 <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">

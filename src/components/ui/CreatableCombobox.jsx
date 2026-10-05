@@ -24,7 +24,8 @@ export default function CreatableCombobox({
   variant = 'input',
   allOptionLabel = '',
   allOptionValue = 'semua',
-  searchPlaceholder = ''
+  searchPlaceholder = '',
+  searchable
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -133,6 +134,9 @@ export default function CreatableCombobox({
     }
   };
 
+  // Kotak pencarian otomatis disembunyikan untuk daftar pendek (<= 7 opsi, non-creatable)
+  const showSearch = searchable !== undefined ? searchable : (creatable || normalizedOptions.length > 7);
+
   const defaultSearchPlaceholder = searchPlaceholder || (
     creatable
       ? 'Cari atau ketik kelas baru...'
@@ -211,6 +215,7 @@ export default function CreatableCombobox({
           }`}
         >
           {/* Kotak Pencarian */}
+          {showSearch && (
           <div className="p-2 border-b border-gray-100 bg-gray-50/70">
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -237,6 +242,7 @@ export default function CreatableCombobox({
               )}
             </div>
           </div>
+          )}
 
           {/* Daftar Opsi */}
           <div className="overflow-y-auto flex-1 divide-y divide-gray-50 py-1">

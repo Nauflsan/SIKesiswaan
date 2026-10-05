@@ -217,29 +217,33 @@ export default function Siswa() {
           variant="pill"
         />
 
-        <select
+        <CreatableCombobox
           value={selectedStatusSP}
-          onChange={(e) => setSelectedStatusSP(e.target.value)}
-          className="text-xs py-1.5 px-3 bg-gray-50 border border-gray-200 rounded-lg font-medium cursor-pointer"
-        >
-          <option value="semua">Semua Status SP</option>
-          <option value="normal">Status Normal (Aman)</option>
-          <option value="sp1">Status SP 1</option>
-          <option value="sp2">Status SP 2</option>
-          <option value="sp3">Status SP 3 (DO)</option>
-        </select>
+          onChange={setSelectedStatusSP}
+          options={[
+            { value: 'normal', label: 'Status Normal (Aman)' },
+            { value: 'sp1', label: 'Status SP 1' },
+            { value: 'sp2', label: 'Status SP 2' },
+            { value: 'sp3', label: 'Status SP 3 (DO)' }
+          ]}
+          allOptionLabel="Semua Status SP"
+          allOptionValue="semua"
+          variant="pill"
+        />
 
-        <select
+        <CreatableCombobox
           value={selectedStatusSiswa}
-          onChange={(e) => setSelectedStatusSiswa(e.target.value)}
-          className="text-xs py-1.5 px-3 bg-gray-50 border border-gray-200 rounded-lg font-medium cursor-pointer"
-        >
-          <option value="aktif">Siswa Aktif</option>
-          <option value="lulus">Lulus</option>
-          <option value="pindah">Pindah Sekolah</option>
-          <option value="keluar">Keluar / DO</option>
-          <option value="semua">Semua Status</option>
-        </select>
+          onChange={setSelectedStatusSiswa}
+          options={[
+            { value: 'aktif', label: 'Siswa Aktif' },
+            { value: 'lulus', label: 'Lulus' },
+            { value: 'pindah', label: 'Pindah Sekolah' },
+            { value: 'keluar', label: 'Keluar / DO' }
+          ]}
+          allOptionLabel="Semua Status"
+          allOptionValue="semua"
+          variant="pill"
+        />
       </div>
 
       {/* Student Cards Grid */}

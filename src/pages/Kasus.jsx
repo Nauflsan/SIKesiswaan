@@ -218,28 +218,28 @@ export default function Kasus() {
         />
 
         {/* Kategori Filter */}
-        <select
+        <CreatableCombobox
           value={selectedKategori}
-          onChange={(e) => setSelectedKategori(e.target.value)}
-          className="text-xs py-1.5 px-3 bg-gray-50 border border-gray-200 rounded-lg font-medium focus:ring-1 focus:ring-[#4A6FA5] cursor-pointer"
-        >
-          <option value="semua">Semua Kategori</option>
-          {kategoriList.map(kat => (
-            <option key={kat.id} value={kat.id}>{kat.nama}</option>
-          ))}
-        </select>
+          onChange={setSelectedKategori}
+          options={kategoriList.map(kat => ({ value: kat.id, label: kat.nama }))}
+          allOptionLabel="Semua Kategori"
+          allOptionValue="semua"
+          variant="pill"
+        />
 
         {/* Status Filter */}
-        <select
+        <CreatableCombobox
           value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
-          className="text-xs py-1.5 px-3 bg-gray-50 border border-gray-200 rounded-lg font-medium focus:ring-1 focus:ring-[#4A6FA5] cursor-pointer"
-        >
-          <option value="semua">Semua Status</option>
-          <option value="baru">Baru</option>
-          <option value="ditangani">Sedang Ditangani</option>
-          <option value="selesai">Selesai</option>
-        </select>
+          onChange={setSelectedStatus}
+          options={[
+            { value: 'baru', label: 'Baru' },
+            { value: 'ditangani', label: 'Sedang Ditangani' },
+            { value: 'selesai', label: 'Selesai' }
+          ]}
+          allOptionLabel="Semua Status"
+          allOptionValue="semua"
+          variant="pill"
+        />
 
         {(selectedKelas !== 'semua' || selectedKategori !== 'semua' || selectedStatus !== 'semua' || search) && (
           <button

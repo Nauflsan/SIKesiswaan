@@ -297,7 +297,7 @@ export default function Rekap() {
         'Kategori Pelanggaran': k.kategoriNama || '-',
         'Poin': Number(k.poin) || 0,
         'Deskripsi / Catatan': k.deskripsi || '-',
-        'Status Penanganan': k.status === 'selesai' ? 'Selesai' : k.status === 'dalam_pembinaan' ? 'Dalam Pembinaan' : 'Baru',
+        'Status Penanganan': k.status === 'selesai' ? 'Selesai' : k.status === 'ditangani' ? 'Sedang Ditangani' : 'Baru',
         'Guru Pencatat': k.createdByNama || '-'
       }));
       const wsDetail = XLSX.utils.json_to_sheet(rowsDetail);
@@ -566,27 +566,27 @@ export default function Rekap() {
             variant="pill"
           />
 
-          <select
+          <CreatableCombobox
             value={selectedKategori}
-            onChange={(e) => setSelectedKategori(e.target.value)}
-            className="py-1 px-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium cursor-pointer max-w-[200px] truncate"
-          >
-            <option value="semua">Semua Kategori</option>
-            {kategoriList.map(k => (
-              <option key={k.id} value={k.id}>{k.nama}</option>
-            ))}
-          </select>
+            onChange={setSelectedKategori}
+            options={kategoriList.map(k => ({ value: k.id, label: k.nama }))}
+            allOptionLabel="Semua Kategori"
+            allOptionValue="semua"
+            variant="pill"
+          />
 
-          <select
+          <CreatableCombobox
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="py-1 px-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium cursor-pointer"
-          >
-            <option value="semua">Semua Status</option>
-            <option value="baru">Baru</option>
-            <option value="dalam_pembinaan">Dalam Pembinaan</option>
-            <option value="selesai">Selesai</option>
-          </select>
+            onChange={setSelectedStatus}
+            options={[
+              { value: 'baru', label: 'Baru' },
+              { value: 'ditangani', label: 'Sedang Ditangani' },
+              { value: 'selesai', label: 'Selesai' }
+            ]}
+            allOptionLabel="Semua Status"
+            allOptionValue="semua"
+            variant="pill"
+          />
         </div>
       </div>
 
