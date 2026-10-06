@@ -305,7 +305,7 @@ export default function Kasus() {
                       <span className="block text-[10px] text-gray-400">NISN: {kasus.siswaNisn}</span>
                     </td>
                     <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 bg-gray-100 text-gray-700 font-medium rounded text-[11px]">
+                      <span className="inline-block whitespace-nowrap px-2 py-0.5 bg-gray-100 text-gray-700 font-medium rounded text-[11px]">
                         {kasus.siswaKelas}
                       </span>
                     </td>

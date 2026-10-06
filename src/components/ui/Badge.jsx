@@ -13,7 +13,7 @@ import { formatBadgeStatusSP, formatBadgeKasus, formatBadgeStatusSiswa } from '.
 export function SPBadge({ status }) {
   const badge = formatBadgeStatusSP(status);
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.color}`}>
+    <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.color}`}>
       {badge.label}
     </span>
   );
@@ -25,7 +25,7 @@ export function SPBadge({ status }) {
 export function StatusSiswaBadge({ status }) {
   const badge = formatBadgeStatusSiswa(status);
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.color}`}>
+    <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badge.color}`}>
       {badge.label}
     </span>
   );
@@ -37,7 +37,7 @@ export function StatusSiswaBadge({ status }) {
 export function KasusStatusBadge({ status }) {
   const badge = formatBadgeKasus(status);
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badge.color}`}>
+    <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium border ${badge.color}`}>
       {badge.label}
     </span>
   );
@@ -48,7 +48,7 @@ export function KasusStatusBadge({ status }) {
  */
 export function PoinBadge({ poin, className = '' }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 ${className}`}>
+    <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-md text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 ${className}`}>
       +{poin} Poin
     </span>
   );
