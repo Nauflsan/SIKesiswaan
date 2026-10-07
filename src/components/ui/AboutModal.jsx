@@ -60,7 +60,7 @@ export default function AboutModal({ isOpen, onClose }) {
                 Mitra Instansi
               </div>
               <div className="font-semibold text-gray-800">
-                SMKS Kharisma Panongan
+                SMK Kharisma Nusantara
               </div>
             </div>
           </div>
@@ -72,7 +72,7 @@ export default function AboutModal({ isOpen, onClose }) {
                 Program & Pengembang
               </div>
               <div className="font-semibold text-gray-800">
-                Pengabdian kepada Masyarakat (PKM)
+                Program Kreativitas Mahasiswa (PKM)
               </div>
               <div className="text-[11px] text-gray-500">
                 Dikembangkan oleh Tim PKM Universitas Pamulang
@@ -87,7 +87,7 @@ export default function AboutModal({ isOpen, onClose }) {
                 Status Hak Cipta (HKI)
               </div>
               <div className="font-semibold text-gray-800">
-                Hak Cipta Terdaftar © 2026
+                Hak Cipta © 2026
               </div>
               <div className="text-[10px] text-gray-500 leading-snug">
                 Dilindungi Undang-Undang Republik Indonesia No. 28 Tahun 2014 tentang Hak Cipta.

@@ -214,7 +214,7 @@ export default function Akun() {
                 <School className="w-3.5 h-3.5 text-[#4A6FA5]" />
                 <span>Mitra Instansi</span>
               </dt>
-              <dd className="font-semibold text-gray-800">SMKS Kharisma Panongan</dd>
+              <dd className="font-semibold text-gray-800">SMK Kharisma Nusantara</dd>
             </div>
 
             <div className="p-3 bg-gray-50/70 rounded-xl border border-gray-100">
@@ -230,7 +230,7 @@ export default function Akun() {
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <div className="text-[11px] text-gray-600 leading-relaxed">
               <strong className="text-gray-900 block font-semibold mb-0.5">
-                Hak Cipta Terdaftar © 2026
+                Hak Cipta © 2026
               </strong>
               Dilindungi oleh Undang-Undang Republik Indonesia Nomor 28 Tahun 2014 tentang Hak Cipta. Seluruh hak cipta atas program komputer dan desain antarmuka dilindungi undang-undang.
             </div>
