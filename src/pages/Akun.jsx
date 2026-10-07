@@ -214,7 +214,7 @@ export default function Akun() {
                 <School className="w-3.5 h-3.5 text-[#4A6FA5]" />
                 <span>Mitra Instansi</span>
               </dt>
-              <dd className="font-semibold text-gray-800">SMK Kharisma Nusantara</dd>
+              <dd className="font-semibold text-gray-800">SMKS Kharisma Panongan</dd>
             </div>
 
             <div className="p-3 bg-gray-50/70 rounded-xl border border-gray-100">

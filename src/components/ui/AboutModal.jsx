@@ -60,7 +60,7 @@ export default function AboutModal({ isOpen, onClose }) {
                 Mitra Instansi
               </div>
               <div className="font-semibold text-gray-800">
-                SMK Kharisma Nusantara
+                SMKS Kharisma Panongan
               </div>
             </div>
           </div>
@@ -72,7 +72,7 @@ export default function AboutModal({ isOpen, onClose }) {
                 Program & Pengembang
               </div>
               <div className="font-semibold text-gray-800">
-                Program Kreativitas Mahasiswa (PKM)
+                Pengabdian Kepada Masyarakat(PKM)
               </div>
               <div className="text-[11px] text-gray-500">
                 Dikembangkan oleh Tim PKM Universitas Pamulang
