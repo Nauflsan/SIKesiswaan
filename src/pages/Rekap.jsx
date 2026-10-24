@@ -735,7 +735,7 @@ export default function Rekap() {
               className="surat-resmi bg-white text-black p-8 sm:p-12 border border-gray-300 shadow-md rounded-lg max-w-full text-xs leading-normal"
             >
               {/* Kop Surat Resmi */}
-              <div className="text-center pb-3 mb-5 border-b-[3px] border-double border-black">
+              <div className="kop-surat text-center pb-3 mb-5 border-b-[3px] border-double border-black">
                 {settings.pemerintahDaerah && (
                   <h3 className="text-sm font-bold uppercase tracking-wider leading-tight">
                     {settings.pemerintahDaerah}
@@ -857,7 +857,7 @@ export default function Rekap() {
               </div>
 
               {/* Tanda Tangan Resmi */}
-              <div className="grid grid-cols-2 gap-8 pt-10 mt-6 text-xs">
+              <div className="tanda-tangan grid grid-cols-2 gap-8 pt-10 mt-6 text-xs">
                 <div>
                   <p>Mengetahui,</p>
                   <p className="font-bold">Waka Kesiswaan / Guru BK</p>

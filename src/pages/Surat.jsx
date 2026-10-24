@@ -433,7 +433,7 @@ export default function Surat() {
               style={{ fontFamily: "'Times New Roman', Times, Georgia, serif" }}
             >
               {/* Kop Surat Resmi */}
-              <div className="pb-3 mb-5 border-b-[3px] border-double border-black">
+              <div className="kop-surat pb-3 mb-5 border-b-[3px] border-double border-black">
                 <div className="flex items-center gap-4">
                   {/* Logo Sekolah di Kiri */}
                   <div className="w-20 shrink-0 flex items-center justify-center">
@@ -478,7 +478,7 @@ export default function Surat() {
 
               {/* Header Surat: Nomor, Lampiran, Hal */}
               <div className="flex justify-between items-start text-xs mb-6 gap-4">
-                <table className="text-xs shrink-0" style={{ width: 'auto' }}>
+                <table className="text-xs shrink-0 tabel-utuh" style={{ width: 'auto' }}>
                   <tbody>
                     <tr><td className="w-20 py-0.5">Nomor</td><td>: {previewSurat.nomorSurat}</td></tr>
                     <tr><td className="py-0.5">Lampiran</td><td>: -</td></tr>
@@ -502,7 +502,7 @@ export default function Surat() {
               <div className="text-xs mb-5">
                 <p>Kepada Yth.</p>
                 <p className="font-bold">Bapak / Ibu Orang Tua / Wali dari Siswa:</p>
-                <table className="my-2 ml-4 text-xs">
+                <table className="my-2 ml-4 text-xs tabel-utuh">
                   <tbody>
                     <tr><td className="w-28 py-0.5 font-medium">Nama Siswa</td><td>: <strong>{previewSurat.siswaNama}</strong></td></tr>
                     <tr><td className="py-0.5 font-medium">NISN</td><td>: {previewSurat.siswaNisn}</td></tr>
@@ -564,7 +564,7 @@ export default function Surat() {
               </div>
 
               {/* Tanda Tangan Resmi */}
-              <div className="flex justify-between items-start pt-8 mt-6 text-xs text-black">
+              <div className="tanda-tangan flex justify-between items-start pt-8 mt-6 text-xs text-black">
                 <div className="w-56 text-left">
                   <p>Mengetahui,</p>
                   <p className="font-bold">Guru Bimbingan Konseling (BK)</p>

@@ -74,45 +74,57 @@
     print-color-adjust: exact !important;
   }
 
-  /* Sembunyikan seluruh UI umum aplikasi */
-  body * {
-    visibility: hidden;
+  /* 1. Hilangkan seluruh UI aplikasi dari tata letak cetak (bukan sekadar disembunyikan,
+        supaya tidak memakan ruang dan tidak menambah halaman kosong).
+        Satu-satunya anak <body> yang tersisa adalah portal Modal. */
+  body > *:not(.print-modal) {
+    display: none !important;
   }
 
-  /* Tampilkan hanya konten dokumen resmi yang dicetak */
+  /* 2. Netralkan pembungkus Modal agar isinya mengalir normal antar halaman */
+  .print-modal {
+    position: static !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    max-height: none !important;
+  }
+  .print-modal .modal-backdrop,
+  .print-modal .modal-header {
+    display: none !important;
+  }
+  .print-modal .modal-card {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+  .print-modal .modal-body {
+    padding: 0 !important;
+  }
+
+  /* 3. Area dokumen resmi mengalir normal (BUKAN fixed) */
   #printable-surat-content,
-  #printable-surat-content *,
   #printable-rekap-content,
-  #printable-rekap-content * {
-    visibility: visible;
-  }
-
-  #printable-surat-content,
-  #printable-rekap-content {
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
+  #printable-laporan-content {
+    position: static !important;
+    display: block !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    border: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
-    background: transparent !important;
-    display: block !important;
-    z-index: 999999 !important;
-  }
-
-  /* Netralkan elemen pembungkus modal & dialog saat mencetak */
-  .fixed,
-  [role="dialog"] {
-    position: static !important;
+    background: #ffffff !important;
     overflow: visible !important;
-    background: transparent !important;
-    backdrop-filter: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    max-height: none !important;
   }
 
   .no-print,
@@ -132,6 +144,10 @@
     color: #000000 !important;
   }
 
+  .surat-resmi .overflow-x-auto {
+    overflow: visible !important;
+  }
+
   .surat-resmi table {
     border-collapse: collapse !important;
   }
@@ -140,11 +156,22 @@
     width: 100% !important;
   }
 
-  /* Cegah bagian krusial surat terpotong di tengah halaman */
-  .surat-resmi table,
+  /* 4. Aturan pemecahan halaman */
+  /* Header kolom tabel diulang di setiap halaman, baris tidak terbelah di tengah */
+  .surat-resmi thead {
+    display: table-header-group !important;
+  }
+  .surat-resmi tfoot {
+    display: table-footer-group !important;
+  }
+  .surat-resmi tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  /* Blok yang harus utuh: kop, tanda tangan, dan tabel kecil bertanda .tabel-utuh */
   .surat-resmi .kop-surat,
   .surat-resmi .tanda-tangan,
-  .surat-resmi tr {
+  .surat-resmi table.tabel-utuh {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
