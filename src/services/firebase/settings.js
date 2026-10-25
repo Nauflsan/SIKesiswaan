@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { hitungStatusSP } from '../../lib/helpers.js';
 import { firebaseLogService } from './log.js';
+import { siswaCache } from './siswaCache.js';
 
 const SETTINGS_DOC_REF = doc(db, 'settings', 'global');
 
@@ -108,6 +109,8 @@ export const firebaseSettingsService = {
           });
           await batch.commit();
         }
+
+        siswaCache.clear();
       } catch (err) {
         throw new Error(
           'Ambang batas tersimpan, tetapi pembaruan status SP siswa gagal. Simpan ulang untuk mencoba lagi.'

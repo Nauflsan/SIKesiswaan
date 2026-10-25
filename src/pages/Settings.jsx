@@ -24,7 +24,7 @@ import { Link } from "wouter-preact";
 import AppLayout from "../components/layout/AppLayout.jsx";
 import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import Modal from "../components/ui/Modal.jsx";
-import { settingsService, authService } from "../services/index.js";
+import { settingsService, authService, siswaService, kelasService } from "../services/index.js";
 import { friendlyError } from '../lib/errors.js';
 import { useAuthStore } from "../stores/authStore.js";
 import { useUIStore } from "../stores/uiStore.js";
@@ -41,7 +41,10 @@ import {
   Mail,
   FileSpreadsheet,
   FileText,
-  ArrowRight
+  ArrowRight,
+  Database,
+  RefreshCw,
+  AlertTriangle
 } from "lucide-preact";
 
 export default function Settings() {
@@ -78,6 +81,54 @@ export default function Settings() {
   const [editForm, setEditForm] = useState({ nama: "", nip: "", jabatan: "", role: "guru_bk" });
   const [submittingEdit, setSubmittingEdit] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
+
+  // State Diagnostik & Pemeliharaan Database (Paket 3A)
+  const [diagnostikData, setDiagnostikData] = useState(null);
+  const [loadingDiagnostik, setLoadingDiagnostik] = useState(false);
+  const [runningBackfill, setRunningBackfill] = useState(false);
+  const [runningRebuildKelas, setRunningRebuildKelas] = useState(false);
+
+  const handlePeriksaData = async () => {
+    setLoadingDiagnostik(true);
+    try {
+      const res = await siswaService.diagnosisStatusSiswa();
+      setDiagnostikData(res);
+      showToast("Pemeriksaan data siswa selesai", "info");
+    } catch (err) {
+      showToast(friendlyError(err, "Gagal memeriksa data siswa"), "error");
+    } finally {
+      setLoadingDiagnostik(false);
+    }
+  };
+
+  const handleSinkronkanStatus = async () => {
+    if (!window.confirm("Sinkronkan status siswa lama menjadi 'aktif'? Tindakan ini akan memperbarui dokumen siswa tanpa status.")) {
+      return;
+    }
+    setRunningBackfill(true);
+    try {
+      const res = await siswaService.backfillStatusSiswa(user);
+      showToast(`Berhasil menyinkronkan ${res.diperbarui} data siswa`, "success");
+      const updatedDiag = await siswaService.diagnosisStatusSiswa();
+      setDiagnostikData(updatedDiag);
+    } catch (err) {
+      showToast(friendlyError(err, "Gagal menyinkronkan status siswa"), "error");
+    } finally {
+      setRunningBackfill(false);
+    }
+  };
+
+  const handleRebuildKelas = async () => {
+    setRunningRebuildKelas(true);
+    try {
+      const list = await kelasService.rebuildFromSiswa(user);
+      showToast(`Daftar kelas diperbarui (${list.length} kelas)`, "success");
+    } catch (err) {
+      showToast(friendlyError(err, "Gagal membangun ulang daftar kelas"), "error");
+    } finally {
+      setRunningRebuildKelas(false);
+    }
+  };
 
   useEffect(() => {
     loadSettings();
@@ -1063,6 +1114,91 @@ export default function Settings() {
                 </span>
               </Link>
             </div>
+          </div>
+
+          {/* Card 4: Pemeriksaan Data Siswa (Fondasi Hemat Kuota) */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+            <div>
+              <h4 className="font-bold font-heading text-sm text-gray-900 mb-1 flex items-center gap-2">
+                <Database className="w-4 h-4 text-[#4A6FA5]" />
+                <span>Pemeriksaan Data Siswa</span>
+              </h4>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Jalankan sekali setelah pembaruan ini agar fitur hemat kuota bekerja dengan benar.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handlePeriksaData}
+                disabled={loadingDiagnostik || runningBackfill || runningRebuildKelas}
+                className="px-4 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-semibold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingDiagnostik ? "animate-spin" : ""}`} />
+                <span>{loadingDiagnostik ? "Memeriksa..." : "Periksa Data"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRebuildKelas}
+                disabled={loadingDiagnostik || runningBackfill || runningRebuildKelas}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${runningRebuildKelas ? "animate-spin" : ""}`} />
+                <span>{runningRebuildKelas ? "Membangun..." : "Bangun Ulang Daftar Kelas"}</span>
+              </button>
+            </div>
+
+            {diagnostikData && (
+              <div className="space-y-3 pt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                    <span className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider">Total</span>
+                    <span className="text-base font-bold text-gray-900 font-mono mt-0.5 block">{diagnostikData.total}</span>
+                  </div>
+                  <div className="p-3 bg-emerald-50/60 border border-emerald-100 rounded-xl text-center">
+                    <span className="block text-[11px] font-medium text-emerald-700 uppercase tracking-wider">Aktif</span>
+                    <span className="text-base font-bold text-emerald-700 font-mono mt-0.5 block">{diagnostikData.aktif}</span>
+                  </div>
+                  <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl text-center">
+                    <span className="block text-[11px] font-medium text-blue-700 uppercase tracking-wider">Lulus</span>
+                    <span className="text-base font-bold text-blue-700 font-mono mt-0.5 block">{diagnostikData.lulus}</span>
+                  </div>
+                  <div className="p-3 bg-amber-50/60 border border-amber-100 rounded-xl text-center">
+                    <span className="block text-[11px] font-medium text-amber-700 uppercase tracking-wider">Pindah</span>
+                    <span className="text-base font-bold text-amber-700 font-mono mt-0.5 block">{diagnostikData.pindah}</span>
+                  </div>
+                  <div className="p-3 bg-rose-50/60 border border-rose-100 rounded-xl text-center">
+                    <span className="block text-[11px] font-medium text-rose-700 uppercase tracking-wider">Keluar</span>
+                    <span className="text-base font-bold text-rose-700 font-mono mt-0.5 block">{diagnostikData.keluar}</span>
+                  </div>
+                  <div className={`p-3 rounded-xl text-center border ${diagnostikData.tanpaStatus > 0 ? "bg-amber-100/70 border-amber-300 text-amber-900" : "bg-gray-50 border-gray-100 text-gray-700"}`}>
+                    <span className="block text-[11px] font-medium uppercase tracking-wider">Tanpa Status</span>
+                    <span className="text-base font-bold font-mono mt-0.5 block">{diagnostikData.tanpaStatus}</span>
+                  </div>
+                </div>
+
+                {diagnostikData.tanpaStatus > 0 && (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        Ada {diagnostikData.tanpaStatus} siswa lama tanpa status. Sinkronkan agar tampil di daftar siswa aktif.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSinkronkanStatus}
+                      disabled={loadingDiagnostik || runningBackfill || runningRebuildKelas}
+                      className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {runningBackfill ? "Menyinkronkan..." : "Sinkronkan Status Siswa"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

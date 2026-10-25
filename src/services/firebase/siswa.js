@@ -18,14 +18,18 @@ import {
   query,
   where,
   orderBy,
-  limit
+  limit,
+  getCountFromServer
 } from 'firebase/firestore';
 import { firebaseLogService } from './log.js';
+import { siswaCache } from './siswaCache.js';
 
 const COLLECTION_NAME = 'siswa';
 
 export const firebaseSiswaService = {
   /**
+   * PERINGATAN: Membaca SELURUH koleksi siswa. Hanya untuk Import dan pemeliharaan.
+   * Jangan dipakai di layar harian.
    * Mengambil daftar siswa dengan kriteria filter kelas, status SP, dan pencarian teks.
    */
   getAll: async ({ kelas, search, statusSP, statusSiswa } = {}) => {
@@ -67,6 +71,189 @@ export const firebaseSiswaService = {
   },
 
   /**
+   * Mengambil daftar siswa aktif dengan cache memori 30 menit per sesi user.
+   */
+  getAktif: async ({ force = false } = {}) => {
+    if (!force) {
+      const cached = siswaCache.get();
+      if (cached) return cached;
+    }
+
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('statusSiswa', '==', 'aktif')
+    );
+    const snap = await getDocs(q);
+    const list = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => s.isActive !== false && !s.deletedAt);
+
+    list.sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id'));
+    siswaCache.set(list);
+    return list.slice();
+  },
+
+  /**
+   * Mengambil siswa pada kelas tertentu tanpa in-memory cache.
+   */
+  getByKelas: async (kelas, { statusSiswa = 'aktif' } = {}) => {
+    const constraints = [where('kelas', '==', kelas)];
+    if (statusSiswa && statusSiswa !== 'semua') {
+      constraints.push(where('statusSiswa', '==', statusSiswa));
+    }
+    const q = query(collection(db, COLLECTION_NAME), ...constraints);
+    const snap = await getDocs(q);
+    const list = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => s.isActive !== false && !s.deletedAt);
+
+    return list.sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id'));
+  },
+
+  /**
+   * Mengambil data siswa berdasarkan NISN persis (semua status siswa).
+   */
+  getByNisn: async (nisn) => {
+    const cleanNisn = String(nisn ?? '').trim();
+    if (!cleanNisn) return [];
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('nisn', '==', cleanNisn)
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => s.isActive !== false && !s.deletedAt);
+  },
+
+  /**
+   * Mengambil daftar siswa berdasarkan kumpulan status tertentu tanpa cache.
+   */
+  getByStatus: async (daftarStatus) => {
+    if (!Array.isArray(daftarStatus) || daftarStatus.length === 0) return [];
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('statusSiswa', 'in', daftarStatus.slice(0, 30))
+    );
+    const snap = await getDocs(q);
+    const list = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => s.isActive !== false && !s.deletedAt);
+
+    return list.sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id'));
+  },
+
+  /**
+   * Menghitung jumlah agregat status SP siswa aktif via getCountFromServer (3 read).
+   */
+  countStatusSP: async () => {
+    const colRef = collection(db, COLLECTION_NAME);
+    const qSp1 = query(colRef, where('statusSiswa', '==', 'aktif'), where('statusSP', '==', 'sp1'));
+    const qSp2 = query(colRef, where('statusSiswa', '==', 'aktif'), where('statusSP', '==', 'sp2'));
+    const qSp3 = query(colRef, where('statusSiswa', '==', 'aktif'), where('statusSP', '==', 'sp3'));
+
+    const [snap1, snap2, snap3] = await Promise.all([
+      getCountFromServer(qSp1),
+      getCountFromServer(qSp2),
+      getCountFromServer(qSp3)
+    ]);
+
+    return {
+      sp1: snap1.data().count,
+      sp2: snap2.data().count,
+      sp3: snap3.data().count
+    };
+  },
+
+  /**
+   * Mengambil N siswa aktif dengan poin pelanggaran tertinggi (totalPoin > 0).
+   */
+  getTopPoin: async (n = 5) => {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      orderBy('totalPoin', 'desc'),
+      limit(n * 6)
+    );
+    const snap = await getDocs(q);
+    const list = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(s => s.isActive !== false && !s.deletedAt)
+      .filter(s => (s.statusSiswa || 'aktif') === 'aktif' && Number(s.totalPoin || 0) > 0);
+
+    return list.slice(0, n);
+  },
+
+  /**
+   * Mengagregasi jumlah siswa per status untuk diagnosis data legacy (Khusus Admin).
+   */
+  diagnosisStatusSiswa: async () => {
+    const colRef = collection(db, COLLECTION_NAME);
+    const qTotal = query(colRef);
+    const qAktif = query(colRef, where('statusSiswa', '==', 'aktif'));
+    const qLulus = query(colRef, where('statusSiswa', '==', 'lulus'));
+    const qPindah = query(colRef, where('statusSiswa', '==', 'pindah'));
+    const qKeluar = query(colRef, where('statusSiswa', '==', 'keluar'));
+
+    const [snapTotal, snapAktif, snapLulus, snapPindah, snapKeluar] = await Promise.all([
+      getCountFromServer(qTotal),
+      getCountFromServer(qAktif),
+      getCountFromServer(qLulus),
+      getCountFromServer(qPindah),
+      getCountFromServer(qKeluar)
+    ]);
+
+    const total = snapTotal.data().count;
+    const aktif = snapAktif.data().count;
+    const lulus = snapLulus.data().count;
+    const pindah = snapPindah.data().count;
+    const keluar = snapKeluar.data().count;
+    const tanpaStatus = Math.max(0, total - (aktif + lulus + pindah + keluar));
+
+    return { total, aktif, lulus, pindah, keluar, tanpaStatus };
+  },
+
+  /**
+   * Menyetel statusSiswa = 'aktif' untuk data siswa legacy yang belum memilikinya (Khusus Admin).
+   */
+  backfillStatusSiswa: async (currentUser) => {
+    const snap = await getDocs(collection(db, COLLECTION_NAME));
+    const targetDocs = snap.docs.filter(d => {
+      const data = d.data();
+      return !data.statusSiswa;
+    });
+
+    const nowIso = new Date().toISOString();
+    const count = targetDocs.length;
+
+    if (count > 0) {
+      for (let i = 0; i < count; i += 400) {
+        const chunk = targetDocs.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(d => {
+          batch.update(doc(db, COLLECTION_NAME, d.id), {
+            statusSiswa: 'aktif',
+            updatedAt: nowIso
+          });
+        });
+        await batch.commit();
+      }
+    }
+
+    siswaCache.clear();
+
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'sinkron_status_siswa',
+      detail: `Menyinkronkan status ${count} siswa lama menjadi aktif`,
+      targetId: 'statusSiswa',
+      targetType: 'siswa'
+    });
+
+    return { diperbarui: count };
+  },
+
+  /**
    * Mendaftarkan data siswa baru secara manual
    */
   create: async (siswaData, currentUser) => {
@@ -88,6 +275,7 @@ export const firebaseSiswaService = {
     };
 
     await setDoc(doc(db, COLLECTION_NAME, newId), newSiswa);
+    siswaCache.upsert(newSiswa);
 
     await firebaseLogService.create({
       userId: currentUser?.id,
@@ -115,6 +303,12 @@ export const firebaseSiswaService = {
     const snap = await getDoc(docRef);
     const updated = { id: snap.id, ...snap.data() };
 
+    if ((updated.statusSiswa || 'aktif') === 'aktif') {
+      siswaCache.upsert(updated);
+    } else {
+      siswaCache.remove(id);
+    }
+
     await firebaseLogService.create({
       userId: currentUser?.id,
       userNama: currentUser?.nama,
@@ -140,6 +334,7 @@ export const firebaseSiswaService = {
       isActive: false,
       deletedAt: new Date().toISOString()
     });
+    siswaCache.remove(id);
 
     await firebaseLogService.create({
       userId: currentUser?.id,
@@ -213,6 +408,8 @@ export const firebaseSiswaService = {
 
       await batch.commit();
     }
+
+    siswaCache.clear();
 
     await firebaseLogService.create({
       userId: currentUser?.id,
@@ -364,6 +561,11 @@ export const firebaseSiswaService = {
     });
 
     const updatedSiswa = { id, ...oldData, ...fieldsToUpdate };
+    if ((updatedSiswa.statusSiswa || 'aktif') === 'aktif') {
+      siswaCache.upsert(updatedSiswa);
+    } else {
+      siswaCache.remove(id);
+    }
     return { siswa: updatedSiswa, kasusDisinkronkan };
   },
 
@@ -412,6 +614,7 @@ export const firebaseSiswaService = {
     }
 
     await deleteDoc(docRef);
+    siswaCache.remove(id);
 
     await firebaseLogService.create({
       userId: currentUser?.id,

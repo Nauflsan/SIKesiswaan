@@ -51,6 +51,9 @@ export default function Log() {
       case 'reset_sandi':
       case 'hapus_user':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">Akun Pengguna</span>;
+      case 'sinkron_status_siswa':
+      case 'bangun_daftar_kelas':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">Pemeliharaan Data</span>;
       case 'import_siswa':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800">Import Excel</span>;
       default:

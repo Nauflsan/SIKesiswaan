@@ -17,6 +17,7 @@ import { firebaseKategoriService } from './firebase/kategori.js';
 import { firebaseSuratService } from './firebase/surat.js';
 import { firebaseSettingsService } from './firebase/settings.js';
 import { firebaseLogService } from './firebase/log.js';
+import { firebaseKelasService } from './firebase/kelas.js';
 
 export const authService = firebaseAuthService;
 export const siswaService = firebaseSiswaService;
@@ -25,4 +26,5 @@ export const kategoriService = firebaseKategoriService;
 export const suratService = firebaseSuratService;
 export const settingsService = firebaseSettingsService;
 export const logService = firebaseLogService;
+export const kelasService = firebaseKelasService;
 

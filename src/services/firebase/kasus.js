@@ -27,6 +27,7 @@ import {
 import { hitungStatusSP } from '../../lib/helpers.js';
 import { defaultSchoolSettings } from './settings.js';
 import { firebaseLogService } from './log.js';
+import { siswaCache } from './siswaCache.js';
 
 const COLLECTION_NAME = 'kasus';
 const SETTINGS_REF = doc(db, 'settings', 'global');
@@ -135,6 +136,7 @@ export const firebaseKasusService = {
     const kasusRef = doc(db, COLLECTION_NAME, newId);
     const nowIso = new Date().toISOString();
 
+    let nilaiBaru = null;
     const { newKasus, siswa, kategori } = await runTransaction(db, async (tx) => {
       // Semua pembacaan harus dilakukan sebelum penulisan pertama
       const siswaSnap = await tx.get(siswaRef);
@@ -170,12 +172,17 @@ export const firebaseKasusService = {
       };
 
       const { totalPoin, statusSP } = applyPoinDelta(siswa, poin, settingsSnap);
+      nilaiBaru = { totalPoin, statusSP };
 
       tx.set(kasusRef, newKasus);
       tx.update(siswaRef, { totalPoin, statusSP, updatedAt: nowIso });
 
       return { newKasus, siswa, kategori };
     });
+
+    if (nilaiBaru) {
+      siswaCache.patch(newKasus.siswaId, nilaiBaru);
+    }
 
     // Audit trail dicatat setelah transaksi berhasil (kegagalan log tidak membatalkan kasus)
     await firebaseLogService.create({
@@ -226,6 +233,7 @@ export const firebaseKasusService = {
     const kasusRef = doc(db, COLLECTION_NAME, id);
     const nowIso = new Date().toISOString();
 
+    let nilaiBaru = null;
     const deleted = await runTransaction(db, async (tx) => {
       const kasusSnap = await tx.get(kasusRef);
       if (!kasusSnap.exists()) throw new Error('Kasus tidak ditemukan');
@@ -250,11 +258,16 @@ export const firebaseKasusService = {
           -Number(kasus.poin || 0),
           settingsSnap
         );
+        nilaiBaru = { totalPoin, statusSP };
         tx.update(siswaRef, { totalPoin, statusSP, updatedAt: nowIso });
       }
 
       return kasus;
     });
+
+    if (deleted && nilaiBaru) {
+      siswaCache.patch(deleted.siswaId, nilaiBaru);
+    }
 
     if (deleted) {
       await firebaseLogService.create({

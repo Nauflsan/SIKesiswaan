@@ -83,5 +83,12 @@ service cloud.firestore {
       allow create: if isStaff() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if false;
     }
+
+    // 8. Meta (daftar kelas dll.). Staff boleh baca dan menulis; hapus hanya admin.
+    match /meta/{docId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
   }
 }
