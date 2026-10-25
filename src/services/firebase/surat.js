@@ -80,6 +80,22 @@ export const firebaseSuratService = {
     const newId = 'srt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     const suratRef = doc(db, COLLECTION_NAME, newId);
 
+    // Ambil jabatan penandatangan dari profil pengguna pembuat surat.
+    // Jika pembacaan gagal atau jabatan belum diisi, gunakan jabatan bawaan sesuai peran akun.
+    // Kegagalan membaca profil tidak boleh menggagalkan proses penerbitan surat.
+    let jabatan = '';
+    if (currentUser?.id) {
+      try {
+        const profil = await getDoc(doc(db, 'users', currentUser.id));
+        jabatan = String(profil.data()?.jabatan || '').trim();
+      } catch {
+        jabatan = '';
+      }
+    }
+    if (!jabatan) {
+      jabatan = currentUser?.role === 'guru_bk' ? 'Guru Bimbingan Konseling (BK)' : currentUser?.role === 'admin' ? 'Kesiswaan' : '';
+    }
+
     const newSurat = await runTransaction(db, async (tx) => {
       // Semua pembacaan harus dilakukan sebelum penulisan pertama
       const siswaSnap = await tx.get(siswaRef);
@@ -127,6 +143,7 @@ export const firebaseSuratService = {
         createdBy: currentUser?.id || 'sys',
         createdByNama: currentUser?.nama || 'Sistem',
         createdByNip: currentUser?.nip || '-',
+        createdByJabatan: jabatan,
         createdAt: now.toISOString()
       };
 

@@ -66,6 +66,7 @@ export default function Settings() {
   const [newUserForm, setNewUserForm] = useState({
     nama: "",
     nip: "",
+    jabatan: "",
     email: "",
     password: "",
     role: "guru_bk",
@@ -74,7 +75,7 @@ export default function Settings() {
 
   // State Modal Edit Pengguna (Khusus Admin): pengguna yang sedang diedit atau null
   const [editingUser, setEditingUser] = useState(null);
-  const [editForm, setEditForm] = useState({ nama: "", nip: "", role: "guru_bk" });
+  const [editForm, setEditForm] = useState({ nama: "", nip: "", jabatan: "", role: "guru_bk" });
   const [submittingEdit, setSubmittingEdit] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
 
@@ -133,6 +134,7 @@ export default function Settings() {
       await createUser({
         nama: newUserForm.nama.trim(),
         nip: newUserForm.nip.trim() || "-",
+        jabatan: newUserForm.jabatan.trim(),
         email: newUserForm.email.trim(),
         password: newUserForm.password.trim(),
         role: newUserForm.role,
@@ -146,6 +148,7 @@ export default function Settings() {
       setNewUserForm({
         nama: "",
         nip: "",
+        jabatan: "",
         email: "",
         password: "",
         role: "guru_bk",
@@ -164,6 +167,7 @@ export default function Settings() {
     setEditForm({
       nama: targetUser.nama || "",
       nip: !targetUser.nip || targetUser.nip === "-" ? "" : targetUser.nip,
+      jabatan: targetUser.jabatan || "",
       role: targetUser.role,
     });
   };
@@ -173,7 +177,7 @@ export default function Settings() {
   };
 
   /**
-   * Handler simpan perubahan pengguna (nama, NIP, role).
+   * Handler simpan perubahan pengguna (nama, NIP, jabatan, role).
    */
   const handleEditUserSubmit = async (e) => {
     e.preventDefault();
@@ -184,6 +188,7 @@ export default function Settings() {
       await updateUser(editingUser.id, {
         nama: editForm.nama,
         nip: editForm.nip,
+        jabatan: editForm.jabatan,
         role: editForm.role,
       });
       showToast(`Data ${editForm.nama.trim()} berhasil diperbarui`, "success");
@@ -571,6 +576,9 @@ export default function Settings() {
                       <div className="text-[10px] text-gray-400 font-mono font-normal">
                         NIP: {u.nip || "-"}
                       </div>
+                      {u.jabatan && (
+                        <div className="text-[10px] text-gray-500 font-normal">{u.jabatan}</div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-gray-500 font-mono">
                       {u.email}
@@ -678,6 +686,25 @@ export default function Settings() {
                     }
                     className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#4A6FA5]"
                   />
+                </div>
+
+                <div>
+                  <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                    Jabatan di Tanda Tangan
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={40}
+                    placeholder="Contoh: Waka Kesiswaan (kosongkan untuk jabatan bawaan)"
+                    value={editForm.jabatan}
+                    onInput={(e) =>
+                      setEditForm({ ...editForm, jabatan: e.target.value })
+                    }
+                    className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#4A6FA5]"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Tercetak di bawah Mengetahui pada surat resmi. Jika kosong: Kesiswaan (Administrator) atau Guru Bimbingan Konseling (BK).
+                  </p>
                 </div>
 
                 <div>
@@ -802,6 +829,25 @@ export default function Settings() {
                   <p className="text-[10px] text-gray-400 mt-1">
                     NIP ini akan tercantum di bawah tanda tangan resmi pada
                     Surat Peringatan (SP).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block font-bold uppercase tracking-wider text-gray-600 mb-1">
+                    Jabatan di Tanda Tangan
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={40}
+                    placeholder="Contoh: Waka Kesiswaan (kosongkan untuk jabatan bawaan)"
+                    value={newUserForm.jabatan}
+                    onInput={(e) =>
+                      setNewUserForm({ ...newUserForm, jabatan: e.target.value })
+                    }
+                    className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#4A6FA5]"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Tercetak di bawah Mengetahui pada surat resmi. Jika kosong: Kesiswaan (Administrator) atau Guru Bimbingan Konseling (BK).
                   </p>
                 </div>
 

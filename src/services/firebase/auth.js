@@ -310,6 +310,7 @@ export const firebaseAuthService = {
       uid: newUid,
       nama: userData.nama.trim(),
       nip: userData.nip ? userData.nip.trim() : '-',
+      jabatan: userData.jabatan ? userData.jabatan.trim() : '',
       email: email,
       role: userData.role,
       isActive: true,
@@ -412,7 +413,7 @@ export const firebaseAuthService = {
   },
 
   /**
-   * Mengubah data profil pengguna: nama, NIP, dan role (Admin Only).
+   * Mengubah data profil pengguna: nama, NIP, jabatan, dan role (Admin Only).
    * Email tidak bisa diubah dari sini. Admin tidak boleh mengubah role akunnya sendiri.
    */
   updateUser: async (userId, data, currentUser) => {
@@ -426,6 +427,7 @@ export const firebaseAuthService = {
       throw new Error('Role tidak valid. Pilih Administrator atau Guru BK.');
     }
     const nip = (data.nip || '').trim() || '-';
+    const jabatan = (data.jabatan || '').trim();
 
     const userDocRef = doc(db, 'users', userId);
     const snap = await getDoc(userDocRef);
@@ -438,11 +440,12 @@ export const firebaseAuthService = {
     }
 
     // Bandingkan dengan data lama; jika tidak ada yang berubah, tidak perlu menulis
-    const prev = { nama: before.nama, nip: before.nip ?? '-', role: before.role };
-    const next = { nama, nip, role: data.role };
+    const prev = { nama: before.nama, nip: before.nip ?? '-', jabatan: before.jabatan ?? '', role: before.role };
+    const next = { nama, nip, jabatan, role: data.role };
     const changes = [];
     if (prev.nama !== next.nama) changes.push(`nama "${prev.nama}" → "${next.nama}"`);
     if (prev.nip !== next.nip) changes.push(`NIP ${prev.nip} → ${next.nip}`);
+    if (prev.jabatan !== next.jabatan) changes.push(`jabatan "${prev.jabatan || '-'}" → "${next.jabatan || '-'}"`);
     if (prev.role !== next.role) {
       changes.push(`role ${ROLE_LABELS[prev.role] || prev.role} → ${ROLE_LABELS[next.role]}`);
     }

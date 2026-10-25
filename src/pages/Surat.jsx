@@ -571,7 +571,7 @@ export default function Surat() {
               <div className="tanda-tangan flex justify-between items-start pt-8 mt-6 text-xs text-black">
                 <div className="w-56 text-left">
                   <p>Mengetahui,</p>
-                  <p className="font-bold">Guru Bimbingan Konseling (BK)</p>
+                  <p className="font-bold">{previewSurat.createdByJabatan || 'Guru Bimbingan Konseling (BK)'}</p>
                   <div className="h-20"></div>
                   <p className="font-bold underline uppercase">{previewSurat.createdByNama || user?.nama || 'Guru Bimbingan Konseling'}</p>
                   <p className="text-[11px]">NIP. {previewSurat.createdByNip || user?.nip || '-'}</p>
