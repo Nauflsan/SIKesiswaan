@@ -104,6 +104,10 @@ export default function Surat() {
         setSelectedSiswaId(sId);
         setShowCreateModal(true);
       }
+        // Hapus query param setelah dipakai agar dialog tidak terbuka lagi saat data dimuat ulang
+      if (suratId || sId) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     } catch (err) {
       const msg = friendlyError(err, 'Gagal memuat arsip surat');
       setLoadError(msg);
