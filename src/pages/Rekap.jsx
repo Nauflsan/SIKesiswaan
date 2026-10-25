@@ -860,7 +860,7 @@ export default function Rekap() {
               <div className="tanda-tangan grid grid-cols-2 gap-8 pt-10 mt-6 text-xs">
                 <div>
                   <p>Mengetahui,</p>
-                  <p className="font-bold">Waka Kesiswaan / Guru BK</p>
+                  <p className="font-bold">{user?.jabatan || (user?.role === 'guru_bk' ? 'Guru Bimbingan Konseling (BK)' : 'Kesiswaan')}</p>
                   <div className="h-20"></div>
                   <p className="font-bold underline uppercase">{user?.nama || 'Guru Bimbingan Konseling'}</p>
                   <p className="text-[11px]">NIP. {user?.nip || '-'}</p>
