@@ -78,10 +78,15 @@ export default function CreatableCombobox({
     return normalizedOptions.some(opt => opt.label.toLowerCase() === q);
   }, [normalizedOptions, searchTerm]);
 
-  // Cari item terpilih saat ini
+  // Item terpilih. Pada mode creatable, nilai yang belum ada di daftar opsi
+  // (kelas baru yang baru diketik) tetap ditampilkan apa adanya.
   const selectedItem = useMemo(() => {
-    return normalizedOptions.find(opt => opt.value === String(value));
-  }, [normalizedOptions, value]);
+    const found = normalizedOptions.find(opt => opt.value === String(value));
+    if (found) return found;
+    const raw = value === null || value === undefined ? '' : String(value).trim();
+    if (creatable && raw) return { value: raw, label: raw, sublabel: '' };
+    return undefined;
+  }, [normalizedOptions, value, creatable]);
 
   // Auto-focus ke input pencarian saat panel dropdown terbuka
   useEffect(() => {
