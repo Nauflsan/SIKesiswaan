@@ -25,9 +25,10 @@ import AppLayout from '../components/layout/AppLayout.jsx';
 import { SPBadge, StatusSiswaBadge } from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
-import { siswaService } from '../services/index.js';
+import { siswaService, kelasService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
+import { DEFAULT_KELAS } from '../lib/helpers.js';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import {
@@ -35,21 +36,32 @@ import {
   UserPlus,
   ArrowRight,
   Filter,
-  User
+  User,
+  RefreshCw
 } from 'lucide-preact';
 
 export default function Siswa() {
   const { user } = useAuthStore();
   const { showToast } = useUIStore();
 
-  // State data siswa mentah dari Firestore (belum difilter) & kontrol filter
-  const [rawSiswaList, setRawSiswaList] = useState([]);
+  // State data siswa aktif, non-aktif on-demand, dan master daftar kelas
+  const [aktifList, setAktifList] = useState([]);
+  const [nonAktifList, setNonAktifList] = useState([]);
+  const [statusDimuat, setStatusDimuat] = useState(new Set());
+  const [kelasList, setKelasList] = useState(DEFAULT_KELAS);
   const [loading, setLoading] = useState(true);
+  const [loadingExtra, setLoadingExtra] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState('');
   const [selectedKelas, setSelectedKelas] = useState('semua');
   const [selectedStatusSP, setSelectedStatusSP] = useState('semua');
   const [selectedStatusSiswa, setSelectedStatusSiswa] = useState('aktif');
+
+  // Gabungan data siswa untuk filter di memori
+  const rawSiswaList = useMemo(
+    () => [...aktifList, ...nonAktifList].sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id')),
+    [aktifList, nonAktifList]
+  );
 
   // State modal penambahan siswa baru
   const [showAddModal, setShowAddModal] = useState(false);
@@ -63,20 +75,31 @@ export default function Siswa() {
   const [submitting, setSubmitting] = useState(false);
 
   /**
-   * Mengambil seluruh daftar siswa dari Firestore SATU KALI saat komponen dimuat.
-   * Filter Kelas, Status SP, Status Siswa, dan pencarian dilakukan di memori klien (useMemo)
-   * agar tidak menembak ulang kuota baca Firestore setiap filter diubah.
+   * Mengambil daftar siswa aktif dari cache/Firestore (dengan TTL 30 menit).
+   * Siswa non-aktif dimuat on-demand saat filter dipilih.
    */
   useEffect(() => {
     loadSiswa();
+    loadKelas();
   }, []);
 
-  async function loadSiswa() {
+  async function loadKelas() {
+    try {
+      const list = await kelasService.get();
+      if (Array.isArray(list) && list.length > 0) {
+        setKelasList(list);
+      }
+    } catch {
+      setKelasList(DEFAULT_KELAS);
+    }
+  }
+
+  async function loadSiswa({ force = false } = {}) {
     setLoading(true);
     setLoadError(null);
     try {
-      const data = await siswaService.getAll();
-      setRawSiswaList(data);
+      const data = await siswaService.getAktif({ force });
+      setAktifList(data);
     } catch (err) {
       const msg = friendlyError(err, 'Gagal memuat daftar siswa');
       setLoadError(msg);
@@ -85,6 +108,60 @@ export default function Siswa() {
       setLoading(false);
     }
   }
+
+  /**
+   * Pemuatan data siswa non-aktif on-demand sesuai filter status yang dipilih
+   */
+  const fetchNonAktif = async (status, dimuat, listSekarang) => {
+    const missing = [];
+    if (status === 'semua') {
+      ['lulus', 'pindah', 'keluar'].forEach(st => {
+        if (!dimuat.has(st)) missing.push(st);
+      });
+    } else if (['lulus', 'pindah', 'keluar'].includes(status)) {
+      if (!dimuat.has(status)) missing.push(status);
+    }
+    if (missing.length === 0) return;
+
+    setLoadingExtra(true);
+    try {
+      const data = await siswaService.getByStatus(missing);
+      setNonAktifList([...listSekarang, ...data]);
+      setStatusDimuat(new Set([...dimuat, ...missing]));
+    } catch (err) {
+      showToast(friendlyError(err, 'Gagal memuat data siswa non-aktif'), 'error');
+    } finally {
+      setLoadingExtra(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedStatusSiswa !== 'aktif') {
+      fetchNonAktif(selectedStatusSiswa, statusDimuat, nonAktifList);
+    }
+  }, [selectedStatusSiswa]);
+
+  /**
+   * Handler tombol Muat Ulang: membersihkan cache dan memuat data segar
+   */
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+      await loadSiswa({ force: true });
+      await loadKelas();
+      setNonAktifList([]);
+      const freshDimuat = new Set();
+      setStatusDimuat(freshDimuat);
+      if (selectedStatusSiswa !== 'aktif') {
+        await fetchNonAktif(selectedStatusSiswa, freshDimuat, []);
+      }
+      showToast('Data siswa berhasil dimuat ulang', 'info');
+    } catch (err) {
+      showToast(friendlyError(err, 'Gagal memuat ulang data siswa'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Daftar siswa yang sudah difilter — dihitung ulang di memori, bukan fetch baru ke Firestore
   const siswaList = useMemo(() => {
@@ -111,16 +188,11 @@ export default function Siswa() {
     return list;
   }, [rawSiswaList, selectedKelas, selectedStatusSP, selectedStatusSiswa, search]);
 
-  // Menghimpun daftar kelas unik secara reaktif dari SELURUH data siswa (bukan hasil filter),
-  // supaya pilihan kelas di dropdown tidak menyusut saat sedang memfilter.
-  const distinctKelas = useMemo(() => Array.from(
-    new Set([
-      'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
-      'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
-      'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2',
-      ...rawSiswaList.map(s => s.kelas).filter(Boolean)
-    ])
-  ).sort(), [rawSiswaList]);
+  // Menghimpun daftar kelas unik dari kelasService + kelas di data siswa
+  const distinctKelas = useMemo(() => Array.from(new Set([
+    ...kelasList,
+    ...rawSiswaList.map(s => s.kelas).filter(Boolean)
+  ])).sort(), [kelasList, rawSiswaList]);
 
   /**
    * Handler penambahan siswa baru ke database
@@ -139,24 +211,41 @@ export default function Siswa() {
       return;
     }
 
-    // Validasi in-memory (0 read Firestore): Cek apakah NISN sudah terdaftar pada siswa aktif
-    const duplicate = rawSiswaList.find(s => s.nisn?.trim() === trimmedNisn);
-    if (duplicate) {
-      showToast(`NISN ${trimmedNisn} sudah terdaftar atas nama ${duplicate.nama} (${duplicate.kelas})`, 'error');
-      return;
-    }
-
     setSubmitting(true);
     try {
+      // Validasi NISN ganda ke server (semua status siswa)
+      const ganda = await siswaService.getByNisn(trimmedNisn);
+      if (ganda.length > 0) {
+        showToast(`NISN ${trimmedNisn} sudah terdaftar atas nama ${ganda[0].nama} (${ganda[0].kelas})`, 'error');
+        setSubmitting(false);
+        return;
+      }
+
       await siswaService.create({
         ...newSiswa,
         nisn: trimmedNisn,
         kelas: finalKelas
       }, user);
+
+      // Simpan kelas baru ke meta/kelas bila belum ada
+      const kelasAda = kelasList.some(k => k.toLowerCase() === finalKelas.toLowerCase());
+      if (!kelasAda) {
+        try {
+          const updatedKelas = await kelasService.add(finalKelas);
+          setKelasList(updatedKelas);
+        } catch {
+          // Diam bila gagal menambah kelas ke meta/kelas
+          setKelasList(prev => [...prev, finalKelas].sort());
+        }
+      }
+
       showToast(`Siswa ${newSiswa.nama} (${finalKelas}) berhasil didaftarkan!`, 'success');
       setShowAddModal(false);
       setNewSiswa({ nisn: '', nama: '', kelas: finalKelas, jurusan: 'Teknik Komputer dan Jaringan', angkatan: 2024 });
-      loadSiswa();
+
+      // Cukup perbarui dari cache siswa aktif (0 read Firestore)
+      const freshAktif = await siswaService.getAktif();
+      setAktifList(freshAktif);
     } catch (err) {
       showToast(err.message || 'Gagal menambahkan siswa', 'error');
     } finally {
@@ -183,6 +272,16 @@ export default function Siswa() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={loading || loadingExtra}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl shadow-2xs transition-all disabled:opacity-50 cursor-pointer"
+            title="Muat ulang data dari server"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Muat Ulang</span>
+          </button>
           <Link
             href="/import"
             className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl shadow-2xs transition-all"
@@ -206,6 +305,7 @@ export default function Siswa() {
         <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 pr-2 border-r border-gray-100">
           <Filter className="w-3.5 h-3.5" />
           <span>Filter:</span>
+          {loadingExtra && <RefreshCw className="w-3 h-3 text-[#4A6FA5] animate-spin ml-1" />}
         </div>
 
         <CreatableCombobox
@@ -255,8 +355,8 @@ export default function Siswa() {
             ) : (
               <>
                 <User className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="font-semibold text-gray-700 text-sm">{loading ? 'Memuat data siswa...' : 'Tidak ada data siswa ditemukan'}</p>
-                {!loading && (
+                <p className="font-semibold text-gray-700 text-sm">{loading || loadingExtra ? 'Memuat data siswa...' : 'Tidak ada data siswa ditemukan'}</p>
+                {!loading && !loadingExtra && (
                   <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian atau filter.</p>
                 )}
               </>

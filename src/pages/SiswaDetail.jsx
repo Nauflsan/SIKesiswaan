@@ -22,7 +22,7 @@ import AppLayout from '../components/layout/AppLayout.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import { SPBadge, KasusStatusBadge, PoinBadge, StatusSiswaBadge } from '../components/ui/Badge.jsx';
-import { siswaService, kasusService, suratService, settingsService } from '../services/index.js';
+import { siswaService, kasusService, suratService, settingsService, kelasService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
@@ -69,15 +69,27 @@ export default function SiswaDetail() {
   // State Modal Konfirmasi Hapus Siswa Permanen
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [kelasList, setKelasList] = useState(DEFAULT_KELAS);
 
   const canEditStatus = user?.role === 'admin' || user?.role === 'guru_bk';
 
-  // Opsi dropdown kelas (DEFAULT_KELAS digabung kelas saat ini, tanpa duplikat, diurutkan)
+  // Muat daftar kelas dari kelasService (fallback DEFAULT_KELAS)
+  useEffect(() => {
+    kelasService.get().then((list) => {
+      if (Array.isArray(list) && list.length > 0) {
+        setKelasList(list);
+      }
+    }).catch(() => {
+      setKelasList(DEFAULT_KELAS);
+    });
+  }, []);
+
+  // Opsi dropdown kelas (kelasList digabung kelas saat ini, tanpa duplikat, diurutkan)
   const kelasOptions = useMemo(() => {
-    const setK = new Set(DEFAULT_KELAS);
+    const setK = new Set(kelasList);
     if (siswa?.kelas) setK.add(siswa.kelas);
     return Array.from(setK).sort();
-  }, [siswa?.kelas]);
+  }, [kelasList, siswa?.kelas]);
 
   // Cek apakah siswa memiliki riwayat kasus atau surat (termasuk kasus soft-delete)
   const hasHistory = kasusList.length > 0 || suratList.length > 0;
@@ -142,6 +154,22 @@ export default function SiswaDetail() {
         hasil.siswa.kelas !== siswa.kelas ||
         hasil.siswa.jurusan !== siswa.jurusan ||
         hasil.siswa.angkatan !== siswa.angkatan;
+
+      // Jika kelas berubah dan belum ada di daftar, tambahkan ke meta/kelas
+      const newKelas = (hasil.siswa.kelas || '').trim();
+      const oldKelas = (siswa.kelas || '').trim();
+      const kelasChanged = newKelas && newKelas.toLowerCase() !== oldKelas.toLowerCase();
+      const alreadyInList = kelasList.some(k => k.toLowerCase() === newKelas.toLowerCase());
+
+      if (kelasChanged && !alreadyInList) {
+        try {
+          const updated = await kelasService.add(newKelas);
+          setKelasList(updated);
+        } catch {
+          // Diam bila gagal menambah kelas ke meta/kelas
+          setKelasList(prev => [...prev, newKelas].sort());
+        }
+      }
 
       if (!isChanged) {
         showToast('Tidak ada perubahan data', 'info');

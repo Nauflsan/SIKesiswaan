@@ -24,7 +24,7 @@
 
 import { useState, useEffect } from 'preact/hooks';
 import AppLayout from '../components/layout/AppLayout.jsx';
-import { siswaService, kategoriService, kasusService } from '../services/index.js';
+import { siswaService, kategoriService, kasusService, kelasService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
@@ -52,10 +52,12 @@ export default function ImportExcel() {
   }, []);
 
   /**
-   * Mengambil data master siswa & kategori untuk keperluan verifikasi/validasi baris Excel
+   * Mengambil data master siswa & kategori untuk keperluan verifikasi/validasi baris Excel.
+   * Tetap memakai getAll() karena operasi import ini langka dan butuh seluruh data untuk validasi duplikasi NISN.
    */
   async function loadPrerequisites() {
     try {
+      // Membaca seluruh data siswa untuk validasi duplikasi NISN lokal saat upload Excel
       const [siswaData, katData] = await Promise.all([
         siswaService.getAll(),
         kategoriService.getAll()
@@ -213,6 +215,24 @@ export default function ImportExcel() {
       if (mode === 'siswa') {
         const payload = validRows.map(r => r.data);
         const res = await siswaService.importBatch(payload, user);
+
+        // Ekstrak dan normalisasi kelas unik dari payload untuk didaftarkan ke meta/kelas
+        const kelasUnik = Array.from(
+          new Set(
+            payload
+              .map(p => String(p.kelas ?? '').trim().replace(/\s+/g, ' '))
+              .filter(Boolean)
+          )
+        );
+
+        if (kelasUnik.length > 0) {
+          try {
+            await kelasService.addMany(kelasUnik);
+          } catch {
+            // Impor batch sudah sukses; kegagalan mendaftarkan kelas ke meta tidak membatalkan proses
+          }
+        }
+
         showToast(`Berhasil mengimpor ${res.imported} siswa baru dan memperbarui ${res.updated} siswa!`, 'success');
       } else {
         for (const row of validRows) {

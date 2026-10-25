@@ -84,27 +84,45 @@ export default function Surat() {
     try {
       const [suratData, siswaData, settingsData] = await Promise.all([
         suratService.getAll(),
-        siswaService.getAll(),
+        siswaService.getAktif(),
         settingsService.get()
       ]);
       setSuratList(suratData);
-      setSiswaList(siswaData);
       setSettings(settingsData);
+
+      let finalSiswaList = siswaData;
 
       // Cek apakah ada query param ?siswaId=... atau ?id=... dari halaman lain
       const params = new URLSearchParams(window.location.search);
       const sId = params.get('siswaId');
       const suratId = params.get('id');
+
+      if (sId && !suratId) {
+        const found = finalSiswaList.find(s => s.id === sId);
+        if (!found) {
+          try {
+            const targetSiswa = await siswaService.getById(sId);
+            if (targetSiswa) {
+              finalSiswaList = [...finalSiswaList, targetSiswa];
+            }
+          } catch {
+            // Bila getById gagal: diam dan lanjutkan seperti perilaku sekarang
+          }
+        }
+        setSelectedSiswaId(sId);
+        setShowCreateModal(true);
+      }
+
+      setSiswaList(finalSiswaList);
+
       if (suratId) {
         const found = suratData.find(s => s.id === suratId);
         if (found) {
           setPreviewSurat(found);
         }
-      } else if (sId) {
-        setSelectedSiswaId(sId);
-        setShowCreateModal(true);
       }
-        // Hapus query param setelah dipakai agar dialog tidak terbuka lagi saat data dimuat ulang
+
+      // Hapus query param setelah dipakai agar dialog tidak terbuka lagi saat data dimuat ulang
       if (suratId || sId) {
         window.history.replaceState(null, '', window.location.pathname);
       }

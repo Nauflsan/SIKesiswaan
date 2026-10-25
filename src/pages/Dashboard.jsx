@@ -69,32 +69,27 @@ export default function Dashboard() {
       const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
       const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-      // Ambil data teroptimasi: server-side range, status 'baru', limit(5)
-      const [kasusBulanIni, belumDitanganiList, recentList, allSiswa, allKategori] = await Promise.all([
+      // Ambil data teroptimasi: server-side range, status 'baru', limit(5), countStatusSP, dan getAktif
+      const [kasusBulanIni, belumDitanganiList, recentList, countsSP, aktifSiswa, allKategori] = await Promise.all([
         kasusService.getByPeriode({ tanggalMulai: startDate, tanggalSelesai: endDate }),
         kasusService.getByStatus('baru'),
         kasusService.getRecent(5),
-        siswaService.getAll(),
+        siswaService.countStatusSP(),
+        siswaService.getAktif(),
         kategoriService.getAll()
       ]);
-
-      // 1. Hitung siswa berstatus SP 1 (Peringatan awal)
-      const siswaSP1 = allSiswa.filter(s => s.statusSP === 'sp1');
-
-      // 2. Hitung siswa berstatus SP 2 atau SP 3 (Zona kritis/terancam DO)
-      const siswaKritis = allSiswa.filter(s => s.statusSP === 'sp2' || s.statusSP === 'sp3');
 
       setStats({
         totalKasusBulanIni: kasusBulanIni.length,
         belumDitangani: belumDitanganiList.length,
-        siswaSP1: siswaSP1.length,
-        siswaKritis: siswaKritis.length
+        siswaSP1: countsSP.sp1,
+        siswaKritis: countsSP.sp2 + countsSP.sp3
       });
 
-      // 3. Ambil 5 siswa dengan total poin tertinggi
-      const sortedSiswa = [...allSiswa]
-        .filter(s => s.totalPoin > 0)
-        .sort((a, b) => b.totalPoin - a.totalPoin)
+      // 3. Ambil 5 siswa aktif dengan total poin tertinggi
+      const sortedSiswa = [...aktifSiswa]
+        .filter(s => Number(s.totalPoin || 0) > 0)
+        .sort((a, b) => (b.totalPoin || 0) - (a.totalPoin || 0))
         .slice(0, 5);
       setTopSiswa(sortedSiswa);
 

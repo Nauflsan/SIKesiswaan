@@ -55,9 +55,10 @@ export default function KasusForm() {
   const [customPoin, setCustomPoin] = useState(null);
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [deskripsi, setDeskripsi] = useState('');
+  const [siswaTerbaru, setSiswaTerbaru] = useState(null);
 
   /**
-   * Mengambil data prasyarat formulir: daftar siswa, kategori pelanggaran, dan konfigurasi ambang batas SP.
+   * Mengambil data prasyarat formulir: daftar siswa aktif, kategori pelanggaran, dan konfigurasi ambang batas SP.
    */
   useEffect(() => {
     loadPrerequisites();
@@ -67,12 +68,12 @@ export default function KasusForm() {
     setLoading(true);
     try {
       const [siswaData, kategoriData, settingsData] = await Promise.all([
-        siswaService.getAll({ statusSiswa: 'aktif' }),
+        siswaService.getAktif(),
         kategoriService.getAll(),
         settingsService.get()
       ]);
 
-      setSiswaList(siswaData);
+      let finalSiswaList = siswaData;
       setKategoriList(kategoriData.filter(k => k.isActive));
       setSettings(settingsData);
 
@@ -80,8 +81,25 @@ export default function KasusForm() {
       const params = new URLSearchParams(window.location.search);
       const preselectedSiswaId = params.get('siswaId');
       if (preselectedSiswaId) {
-        setSelectedSiswaId(preselectedSiswaId);
+        const found = finalSiswaList.find(s => s.id === preselectedSiswaId);
+        if (found) {
+          setSelectedSiswaId(preselectedSiswaId);
+        } else {
+          try {
+            const targetSiswa = await siswaService.getById(preselectedSiswaId);
+            if ((targetSiswa.statusSiswa || 'aktif') === 'aktif') {
+              finalSiswaList = [...finalSiswaList, targetSiswa];
+              setSelectedSiswaId(preselectedSiswaId);
+            } else {
+              showToast('Siswa tidak berstatus aktif, tidak dapat dicatat pelanggarannya', 'info');
+            }
+          } catch {
+            // Gagal memuat ID preselected -> abaikan
+          }
+        }
       }
+
+      setSiswaList(finalSiswaList);
     } catch (err) {
       showToast(friendlyError(err, 'Gagal memuat data formulir'), 'error');
     } finally {
@@ -89,8 +107,33 @@ export default function KasusForm() {
     }
   }
 
+  // Efek refresh data siswa terpilih untuk akurasi simulasi poin real-time
+  useEffect(() => {
+    if (!selectedSiswaId) {
+      setSiswaTerbaru(null);
+      return;
+    }
+
+    let batal = false;
+    siswaService.getById(selectedSiswaId)
+      .then((hasil) => {
+        if (!batal) {
+          setSiswaTerbaru(hasil);
+        }
+      })
+      .catch(() => {
+        // Gagal memuat -> diam, pakai nilai dari siswaList
+      });
+
+    return () => {
+      batal = true;
+    };
+  }, [selectedSiswaId]);
+
   // Objek referensi siswa & kategori yang sedang dipilih di form
-  const selectedSiswa = siswaList.find(s => s.id === selectedSiswaId);
+  const selectedSiswa = (siswaTerbaru && siswaTerbaru.id === selectedSiswaId)
+    ? siswaTerbaru
+    : siswaList.find(s => s.id === selectedSiswaId);
   const selectedKategori = kategoriList.find(k => k.id === selectedKategoriId);
 
   // Poin aktif: gunakan custom poin jika telah diubah oleh Admin/BK, atau poin default kategori
