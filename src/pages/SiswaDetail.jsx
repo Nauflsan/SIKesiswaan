@@ -16,28 +16,31 @@
  * =============================================================================
  */
 
-import { useState, useEffect } from 'preact/hooks';
-import { Link, useRoute } from 'wouter-preact';
+import { useState, useEffect, useMemo } from 'preact/hooks';
+import { Link, useRoute, useLocation } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
+import Modal from '../components/ui/Modal.jsx';
 import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import { SPBadge, KasusStatusBadge, PoinBadge, StatusSiswaBadge } from '../components/ui/Badge.jsx';
 import { siswaService, kasusService, suratService, settingsService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
-import { formatTanggal, formatBadgeStatusSiswa } from '../lib/helpers.js';
+import { formatTanggal, formatBadgeStatusSiswa, DEFAULT_KELAS } from '../lib/helpers.js';
 import {
   ArrowLeft,
   FileText,
   PlusCircle,
   AlertTriangle,
-  GraduationCap
+  GraduationCap,
+  Pencil
 } from 'lucide-preact';
 
 export default function SiswaDetail() {
   // Tangkap parameter :id dari routing URL /siswa/:id
   const [, params] = useRoute('/siswa/:id');
   const siswaId = params?.id;
+  const [, setLocation] = useLocation();
 
   const { user } = useAuthStore();
   const { showToast } = useUIStore();
@@ -51,7 +54,121 @@ export default function SiswaDetail() {
   const [activeTab, setActiveTab] = useState('riwayat'); // 'riwayat' | 'surat'
   const [savingStatus, setSavingStatus] = useState(false);
 
+  // State Modal Edit Data Siswa
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    nisn: '',
+    nama: '',
+    kelas: '',
+    jurusan: '',
+    angkatan: new Date().getFullYear()
+  });
+  const [syncKasus, setSyncKasus] = useState(true);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // State Modal Konfirmasi Hapus Siswa Permanen
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const canEditStatus = user?.role === 'admin' || user?.role === 'guru_bk';
+
+  // Opsi dropdown kelas (DEFAULT_KELAS digabung kelas saat ini, tanpa duplikat, diurutkan)
+  const kelasOptions = useMemo(() => {
+    const setK = new Set(DEFAULT_KELAS);
+    if (siswa?.kelas) setK.add(siswa.kelas);
+    return Array.from(setK).sort();
+  }, [siswa?.kelas]);
+
+  // Cek apakah siswa memiliki riwayat kasus atau surat (termasuk kasus soft-delete)
+  const hasHistory = kasusList.length > 0 || suratList.length > 0;
+
+  // Cek apakah nama atau NISN berubah untuk menampilkan checkbox sinkronisasi kasus
+  const isNameOrNisnChanged = Boolean(
+    siswa &&
+      (editForm.nama.trim() !== (siswa.nama || '').trim() ||
+        editForm.nisn.trim() !== String(siswa.nisn || '').trim())
+  );
+  const showSyncCheckbox = isNameOrNisnChanged && kasusList.length > 0;
+
+  const openEditModal = () => {
+    if (!siswa) return;
+    setEditForm({
+      nisn: siswa.nisn || '',
+      nama: siswa.nama || '',
+      kelas: siswa.kelas || '',
+      jurusan: siswa.jurusan || '',
+      angkatan: siswa.angkatan || new Date().getFullYear()
+    });
+    setSyncKasus(true);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!siswa) return;
+
+    setSavingEdit(true);
+    try {
+      const hasil = await siswaService.updateProfil(
+        siswa.id,
+        {
+          nisn: editForm.nisn,
+          nama: editForm.nama,
+          kelas: editForm.kelas,
+          jurusan: editForm.jurusan,
+          angkatan: editForm.angkatan
+        },
+        { syncKasus },
+        user
+      );
+
+      setShowEditModal(false);
+      setSiswa(hasil.siswa);
+
+      // Jika ada sinkronisasi kasus, perbarui data kasusList di state lokal
+      if (hasil.kasusDisinkronkan > 0) {
+        setKasusList((prev) =>
+          prev.map((k) => ({
+            ...k,
+            siswaNama: hasil.siswa.nama,
+            siswaNisn: hasil.siswa.nisn
+          }))
+        );
+      }
+
+      const isChanged =
+        hasil.siswa.nama !== siswa.nama ||
+        hasil.siswa.nisn !== siswa.nisn ||
+        hasil.siswa.kelas !== siswa.kelas ||
+        hasil.siswa.jurusan !== siswa.jurusan ||
+        hasil.siswa.angkatan !== siswa.angkatan;
+
+      if (!isChanged) {
+        showToast('Tidak ada perubahan data', 'info');
+      } else {
+        showToast('Data siswa berhasil diperbarui', 'success');
+      }
+    } catch (err) {
+      showToast(err.message || friendlyError(err, 'Gagal menyimpan perubahan'), 'error');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteSiswaPermanen = async () => {
+    if (!siswa) return;
+    setDeleting(true);
+    try {
+      await siswaService.hapusPermanen(siswa.id, user);
+      showToast('Siswa dihapus permanen', 'success');
+      setShowDeleteConfirm(false);
+      setLocation('/siswa');
+    } catch (err) {
+      showToast(err.message || friendlyError(err, 'Gagal menghapus siswa'), 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   /**
    * Mengubah status keaktifan siswa (aktif/lulus/pindah/keluar)
@@ -178,7 +295,17 @@ export default function SiswaDetail() {
           </div>
 
           {/* Quick Actions for this student */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {canEditStatus && (
+              <button
+                type="button"
+                onClick={openEditModal}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl border border-gray-200 shadow-xs transition-all cursor-pointer"
+              >
+                <Pencil className="w-4 h-4" />
+                <span>Edit Data</span>
+              </button>
+            )}
             <Link
               href={`/kasus/tambah?siswaId=${siswa.id}`}
               className="inline-flex items-center gap-2 px-4 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-semibold rounded-xl shadow-xs transition-all"
@@ -358,6 +485,204 @@ export default function SiswaDetail() {
           )}
         </div>
       </div>
+
+      {/* Modal Edit Data Siswa */}
+      {showEditModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => !savingEdit && setShowEditModal(false)}
+          title="Edit Data Siswa"
+        >
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+                NISN / Nomor Induk Siswa <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                maxLength="20"
+                placeholder="Contoh: 0081234567 atau 11 digit"
+                value={editForm.nisn}
+                onInput={(e) =>
+                  setEditForm({ ...editForm, nisn: e.target.value.replace(/\D/g, '') })
+                }
+                className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#4A6FA5] font-mono"
+              />
+              <span className="text-[10px] text-gray-400 mt-1 block">
+                Mendukung 6 hingga 20 digit angka
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+                Nama Lengkap Siswa <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Nama sesuai ijazah/rapor"
+                value={editForm.nama}
+                onInput={(e) => setEditForm({ ...editForm, nama: e.target.value })}
+                className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#4A6FA5]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+                Kelas Siswa <span className="text-red-500">*</span>
+              </label>
+              <CreatableCombobox
+                value={editForm.kelas}
+                onChange={(val) => setEditForm({ ...editForm, kelas: val })}
+                options={kelasOptions}
+                placeholder="Pilih atau ketik kelas baru..."
+                creatable={true}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+                  Tahun Angkatan
+                </label>
+                <input
+                  type="number"
+                  value={editForm.angkatan}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, angkatan: Number(e.target.value) })
+                  }
+                  className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
+                Jurusan / Konsentrasi Keahlian
+              </label>
+              <input
+                type="text"
+                list="jurusan-options-edit"
+                placeholder="Ketik atau pilih jurusan (contoh: Teknik Komputer dan Jaringan)"
+                value={editForm.jurusan}
+                onInput={(e) => setEditForm({ ...editForm, jurusan: e.target.value })}
+                className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#4A6FA5]"
+              />
+              <datalist id="jurusan-options-edit">
+                <option value="Teknik Komputer dan Jaringan" />
+                <option value="Teknik Kendaraan Ringan" />
+              </datalist>
+            </div>
+
+            {showSyncCheckbox && (
+              <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 space-y-1">
+                <label className="flex items-start gap-2 cursor-pointer text-xs font-semibold text-blue-900">
+                  <input
+                    type="checkbox"
+                    checked={syncKasus}
+                    onChange={(e) => setSyncKasus(e.target.checked)}
+                    className="mt-0.5 rounded border-gray-300 text-[#4A6FA5] focus:ring-[#4A6FA5]"
+                  />
+                  <span>
+                    Perbarui juga nama dan NISN pada riwayat kasus ({kasusList.length} kasus)
+                  </span>
+                </label>
+                <p className="text-[10px] text-gray-500 pl-5 leading-normal">
+                  Kelas pada riwayat kasus tidak diubah agar tetap mencerminkan kelas saat kejadian.
+                  Surat yang sudah terbit tidak diubah.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-gray-100">
+              <div>
+                {user?.role === 'admin' &&
+                  (hasHistory ? (
+                    <div>
+                      <button
+                        type="button"
+                        disabled
+                        className="text-xs font-semibold text-gray-400 cursor-not-allowed"
+                      >
+                        Hapus Siswa
+                      </button>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Tidak dapat dihapus karena memiliki riwayat. Gunakan status Keluar, Lulus, atau Pindah.
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={savingEdit}
+                      onClick={() => {
+                        setShowEditModal(false);
+                        setShowDeleteConfirm(true);
+                      }}
+                      className="text-xs font-semibold text-red-600 hover:text-red-700 cursor-pointer disabled:opacity-50"
+                    >
+                      Hapus Siswa
+                    </button>
+                  ))}
+              </div>
+
+              <div className="flex justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={savingEdit}
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl disabled:opacity-50 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-bold rounded-xl shadow-xs disabled:opacity-50 cursor-pointer"
+                >
+                  {savingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <Modal
+          isOpen={true}
+          onClose={() => !deleting && setShowDeleteConfirm(false)}
+          title="Konfirmasi Hapus Siswa"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Apakah Anda yakin ingin menghapus data siswa <strong>{siswa.nama}</strong> (NISN: {siswa.nisn})?
+            </p>
+            <div className="p-3 bg-red-50 rounded-xl text-xs text-red-800 border border-red-200">
+              ⚠️ Data siswa dihapus permanen dan tidak dapat dikembalikan.
+            </div>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDeleteSiswaPermanen}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                {deleting ? 'Menghapus...' : 'Ya, Hapus Permanen'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </AppLayout>
   );
 }

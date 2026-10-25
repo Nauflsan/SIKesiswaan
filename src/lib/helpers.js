@@ -227,3 +227,10 @@ export function getRentangPeriodePreset(tipe, bulanMulai = 7, refDate = new Date
     label: `Tahun Ajaran ${labelTahunAjaran}`
   };
 }
+
+/** Daftar kelas bawaan sekolah (dipakai sebagai opsi awal dropdown kelas). */
+export const DEFAULT_KELAS = [
+  'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
+  'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
+  'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2'
+];

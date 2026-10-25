@@ -42,6 +42,8 @@ export default function Log() {
       case 'hapus_siswa':
       case 'hapus_kategori':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Hapus (Soft)</span>;
+      case 'hapus_permanen_siswa':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Hapus Permanen</span>;
       case 'buat_surat':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Surat SP</span>;
       case 'edit_user':
