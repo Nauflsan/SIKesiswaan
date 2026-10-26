@@ -278,6 +278,7 @@ export default function Siswa() {
    */
   const openLaporanKelasModal = async () => {
     if (selectedKelas === 'semua') return;
+    setLaporanKelasData({ siswaList: [], kasusList: [], suratList: [], settings: {} });
     setShowLaporanKelasModal(true);
     setLoadingLaporan(true);
     try {
@@ -685,7 +686,7 @@ export default function Siswa() {
       <Modal
         isOpen={showLaporanKelasModal}
         onClose={() => setShowLaporanKelasModal(false)}
-        title={`Laporan Kedisiplinan Kelas ${selectedKelas}`}
+        title={`Laporan Kelas ${selectedKelas}`}
         maxWidth="max-w-4xl"
       >
         <div className="space-y-6">

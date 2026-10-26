@@ -196,7 +196,7 @@ export default function LaporanSiswa({
       </p>
 
       {/* 8. Lembar Tanda Tangan Kedinasan */}
-      <div className="tanda-tangan grid grid-cols-2 gap-8 pt-6 mt-6 text-xs text-black">
+      <div className="tanda-tangan grid grid-cols-2 gap-8 pt-10 mt-6 text-xs text-black">
         <div>
           <p>Mengetahui,</p>
           <p className="font-bold">

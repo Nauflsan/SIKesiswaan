@@ -149,7 +149,7 @@ export async function eksporLaporanExcel({ tipe, data, periodeLabel }) {
     // Sheet 2: Kronologi
     const kronologiRows = (kasus || []).map((k, idx) => ({
       'No': idx + 1,
-      'Tanggal': k.tanggal || '-',
+      'Tanggal': formatTanggal(k.tanggal),
       'Bentuk Pelanggaran': k.kategoriNama || '-',
       'Poin': Number(k.poin) || 0,
       'Deskripsi / Catatan': k.deskripsi || '-',
@@ -175,7 +175,7 @@ export async function eksporLaporanExcel({ tipe, data, periodeLabel }) {
       'Nomor Surat': s.nomorSurat || '-',
       'Jenis Surat': labelJenisSurat(s.jenis),
       'Perihal': s.perihal || '-',
-      'Tanggal Surat': s.tanggalSurat || (s.createdAt ? s.createdAt.slice(0, 10) : '-'),
+      'Tanggal Surat': formatTanggal(s.tanggalSurat || (s.createdAt ? s.createdAt.slice(0, 10) : '')),
       'Poin Saat Terbit': Number(s.totalPoin) || 0
     }));
     const wsSurat = XLSX.utils.json_to_sheet(
@@ -228,7 +228,7 @@ export async function eksporLaporanExcel({ tipe, data, periodeLabel }) {
 
     const kronologiKelasRows = semuaKasus.map((k, idx) => ({
       'No': idx + 1,
-      'Tanggal': k.tanggal || '-',
+      'Tanggal': formatTanggal(k.tanggal),
       'NISN': k.siswaNisn || '-',
       'Nama Siswa': k.siswaNama || '-',
       'Bentuk Pelanggaran': k.kategoriNama || '-',
