@@ -61,6 +61,46 @@ export const firebaseSuratService = {
   },
 
   /**
+   * Mengambil arsip surat peringatan untuk banyak siswa sekaligus (batch chunks max 30 per in-query).
+   * Menghindari full-scan koleksi saat membuat laporan kedisiplinan satu kelas.
+   * Query sengaja tanpa orderBy untuk mencegah kebutuhan indeks komposit Firestore.
+   *
+   * @param {string[]} daftarId - Array ID siswa
+   * @returns {Promise<Array>}
+   */
+  getBySiswaIds: async (daftarId) => {
+    if (!Array.isArray(daftarId) || daftarId.length === 0) return [];
+
+    const validIds = Array.from(new Set(daftarId.filter(Boolean)));
+    if (validIds.length === 0) return [];
+
+    const chunks = [];
+    for (let i = 0; i < validIds.length; i += 30) {
+      chunks.push(validIds.slice(i, i + 30));
+    }
+
+    const snaps = await Promise.all(
+      chunks.map(chunk =>
+        getDocs(
+          query(
+            collection(db, COLLECTION_NAME),
+            where('siswaId', 'in', chunk)
+          )
+        )
+      )
+    );
+
+    let list = [];
+    snaps.forEach(snap => {
+      snap.docs.forEach(d => {
+        list.push({ id: d.id, ...d.data() });
+      });
+    });
+
+    return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  },
+
+  /**
    * Mengambil detail surat berdasarkan ID
    */
   getById: async (id) => {

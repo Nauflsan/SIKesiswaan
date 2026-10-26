@@ -25,10 +25,12 @@ import AppLayout from '../components/layout/AppLayout.jsx';
 import { SPBadge, StatusSiswaBadge } from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
-import { siswaService, kelasService } from '../services/index.js';
+import { siswaService, kelasService, kasusService, suratService, settingsService, logService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
-import { DEFAULT_KELAS } from '../lib/helpers.js';
+import { DEFAULT_KELAS, formatTanggal, getRentangPeriodePreset } from '../lib/helpers.js';
+import { filterKasusPeriode, eksporLaporanExcel } from '../lib/laporan.js';
+import LaporanKelas from '../components/print/LaporanKelas.jsx';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
 import {
@@ -37,7 +39,9 @@ import {
   ArrowRight,
   Filter,
   User,
-  RefreshCw
+  RefreshCw,
+  Printer,
+  FileSpreadsheet
 } from 'lucide-preact';
 
 export default function Siswa() {
@@ -73,6 +77,21 @@ export default function Siswa() {
     angkatan: 2024
   });
   const [submitting, setSubmitting] = useState(false);
+
+  // State Modal Laporan Kedisiplinan Kelas
+  const [showLaporanKelasModal, setShowLaporanKelasModal] = useState(false);
+  const [loadingLaporan, setLoadingLaporan] = useState(false);
+  const [laporanKelasData, setLaporanKelasData] = useState({
+    siswaList: [],
+    kasusList: [],
+    suratList: [],
+    settings: {}
+  });
+  const [laporanPeriodePreset, setLaporanPeriodePreset] = useState('seluruh');
+  const [laporanTanggalMulai, setLaporanTanggalMulai] = useState('');
+  const [laporanTanggalSelesai, setLaporanTanggalSelesai] = useState('');
+  const [sertakanTanpaKasus, setSertakanTanpaKasus] = useState(true);
+  const [exportingExcelLaporan, setExportingExcelLaporan] = useState(false);
 
   /**
    * Mengambil daftar siswa aktif dari cache/Firestore (dengan TTL 30 menit).
@@ -253,6 +272,142 @@ export default function Siswa() {
     }
   };
 
+  /**
+   * Membuka modal Laporan Kelas dan memuat data siswa, kasus, surat, serta settings
+   * langsung dari server saat modal dibuka.
+   */
+  const openLaporanKelasModal = async () => {
+    if (selectedKelas === 'semua') return;
+    setShowLaporanKelasModal(true);
+    setLoadingLaporan(true);
+    try {
+      // 1. Ambil seluruh siswa aktif di kelas tersebut langsung ke server (fresh totalPoin)
+      const siswaKelas = await siswaService.getByKelas(selectedKelas, { statusSiswa: 'aktif' });
+      const ids = siswaKelas.map(s => s.id);
+
+      // 2 & 3. Ambil data kasus, surat, dan settings secara paralel
+      const [kasusData, suratData, settingsData] = await Promise.all([
+        ids.length > 0 ? kasusService.getBySiswaIds(ids) : Promise.resolve([]),
+        ids.length > 0 ? suratService.getBySiswaIds(ids) : Promise.resolve([]),
+        settingsService.get()
+      ]);
+
+      setLaporanKelasData({
+        siswaList: siswaKelas,
+        kasusList: kasusData,
+        suratList: suratData,
+        settings: settingsData
+      });
+    } catch (err) {
+      showToast(friendlyError(err, 'Gagal memuat data laporan kelas'), 'error');
+    } finally {
+      setLoadingLaporan(false);
+    }
+  };
+
+  // Komputasi pemfilteran periode dan pembentukan daftar lembar laporan siswa
+  const { daftarLaporan, periodeLabelLaporan, isLaporanDateInvalid } = useMemo(() => {
+    let mulai = '';
+    let selesai = '';
+    let label = 'Seluruh Riwayat';
+    let invalid = false;
+
+    if (laporanPeriodePreset === 'kustom') {
+      mulai = laporanTanggalMulai;
+      selesai = laporanTanggalSelesai;
+      if (mulai && selesai && mulai > selesai) {
+        invalid = true;
+      }
+      if (mulai && selesai) {
+        label = `${formatTanggal(mulai)} s.d. ${formatTanggal(selesai)}`;
+      } else if (mulai) {
+        label = `Mulai ${formatTanggal(mulai)}`;
+      } else if (selesai) {
+        label = `Sampai ${formatTanggal(selesai)}`;
+      } else {
+        label = 'Rentang Kustom (Semua)';
+      }
+    } else if (laporanPeriodePreset !== 'seluruh') {
+      const presetData = getRentangPeriodePreset(laporanPeriodePreset, laporanKelasData.settings?.bulanMulaiTahunAjaran);
+      mulai = presetData.tanggalMulai;
+      selesai = presetData.tanggalSelesai;
+      label = presetData.label;
+    }
+
+    // Bangun daftar per siswa
+    const daftar = [];
+    (laporanKelasData.siswaList || []).forEach(siswa => {
+      const semuaKasusSiswa = (laporanKelasData.kasusList || []).filter(k => k.siswaId === siswa.id);
+      const kasusSiswaPeriode = filterKasusPeriode(semuaKasusSiswa, mulai, selesai);
+      const suratSiswa = (laporanKelasData.suratList || []).filter(srt => srt.siswaId === siswa.id);
+
+      // Sesuai 10.4: "Sertakan siswa tanpa pelanggaran" menyaring berdasarkan kasus dalam periode yang dipilih
+      if (!sertakanTanpaKasus && kasusSiswaPeriode.length === 0) {
+        return;
+      }
+
+      daftar.push({
+        siswa,
+        kasus: kasusSiswaPeriode,
+        suratList: suratSiswa
+      });
+    });
+
+    return {
+      daftarLaporan: daftar,
+      periodeLabelLaporan: label,
+      isLaporanDateInvalid: invalid
+    };
+  }, [
+    laporanKelasData,
+    laporanPeriodePreset,
+    laporanTanggalMulai,
+    laporanTanggalSelesai,
+    sertakanTanpaKasus
+  ]);
+
+  const handlePrintLaporanKelas = async () => {
+    if (isLaporanDateInvalid || daftarLaporan.length === 0) return;
+    try {
+      await logService.create({
+        userId: user?.id,
+        userNama: user?.nama,
+        aksi: 'cetak_laporan',
+        detail: `Mencetak laporan kelas ${selectedKelas} (${daftarLaporan.length} siswa, periode: ${periodeLabelLaporan})`,
+        targetId: selectedKelas,
+        targetType: 'kelas'
+      });
+    } catch {
+      // Intentionally safe
+    }
+    window.print();
+  };
+
+  const handleExportExcelLaporanKelas = async () => {
+    if (isLaporanDateInvalid || exportingExcelLaporan || daftarLaporan.length === 0) return;
+    setExportingExcelLaporan(true);
+    try {
+      await eksporLaporanExcel({
+        tipe: 'kelas',
+        data: { kelas: selectedKelas, daftar: daftarLaporan },
+        periodeLabel: periodeLabelLaporan
+      });
+      showToast('Laporan kelas berhasil diekspor ke Excel', 'success');
+      await logService.create({
+        userId: user?.id,
+        userNama: user?.nama,
+        aksi: 'cetak_laporan',
+        detail: `Mengekspor laporan kelas ${selectedKelas} (${daftarLaporan.length} siswa, periode: ${periodeLabelLaporan}) ke Excel`,
+        targetId: selectedKelas,
+        targetType: 'kelas'
+      });
+    } catch (err) {
+      showToast('Gagal mengekspor spreadsheet: ' + friendlyError(err, 'Terjadi kesalahan sistem'), 'error');
+    } finally {
+      setExportingExcelLaporan(false);
+    }
+  };
+
   return (
     <AppLayout
       title="Direktori Data Siswa"
@@ -288,6 +443,18 @@ export default function Siswa() {
           >
             <span>Import Excel</span>
           </Link>
+          {(user?.role === 'admin' || user?.role === 'guru_bk') && (
+            <button
+              type="button"
+              onClick={openLaporanKelasModal}
+              disabled={selectedKelas === 'semua'}
+              title={selectedKelas === 'semua' ? 'Pilih satu kelas dahulu' : `Buka Laporan Kelas ${selectedKelas}`}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl shadow-2xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <Printer className="w-4 h-4 text-gray-500" />
+              <span>Laporan Kelas</span>
+            </button>
+          )}
           {(user?.role === 'admin' || user?.role === 'guru_bk') && (
             <button
               onClick={() => setShowAddModal(true)}
@@ -513,6 +680,156 @@ export default function Siswa() {
           </form>
         </Modal>
       )}
+
+      {/* Modal Laporan Kedisiplinan Kelas */}
+      <Modal
+        isOpen={showLaporanKelasModal}
+        onClose={() => setShowLaporanKelasModal(false)}
+        title={`Laporan Kedisiplinan Kelas ${selectedKelas}`}
+        maxWidth="max-w-4xl"
+      >
+        <div className="space-y-6">
+          {/* Kontrol di modal (no-print) */}
+          <div className="no-print bg-gray-50/70 p-4 rounded-xl border border-gray-200/70 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="w-56 shrink-0">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                  Pilih Periode
+                </label>
+                <CreatableCombobox
+                  value={laporanPeriodePreset}
+                  onChange={(val) => setLaporanPeriodePreset(val)}
+                  options={[
+                    { value: 'seluruh', label: 'Seluruh Riwayat' },
+                    { value: 'tahun_ajaran_ini', label: 'Tahun Ajaran Ini' },
+                    { value: 'semester_ganjil', label: 'Semester Ganjil' },
+                    { value: 'semester_genap', label: 'Semester Genap' },
+                    { value: 'kustom', label: 'Rentang Kustom' }
+                  ]}
+                  creatable={false}
+                  searchable={false}
+                  variant="input"
+                />
+              </div>
+
+              {laporanPeriodePreset === 'kustom' && (
+                <div className="flex flex-wrap items-center gap-2 pt-4 sm:pt-0">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-0.5">
+                      Tanggal Mulai
+                    </label>
+                    <input
+                      type="date"
+                      value={laporanTanggalMulai}
+                      onChange={(e) => setLaporanTanggalMulai(e.target.value)}
+                      className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-hidden focus:border-[#4A6FA5]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-0.5">
+                      Tanggal Selesai
+                    </label>
+                    <input
+                      type="date"
+                      value={laporanTanggalSelesai}
+                      onChange={(e) => setLaporanTanggalSelesai(e.target.value)}
+                      className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-hidden focus:border-[#4A6FA5]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {isLaporanDateInvalid && (
+              <p className="text-xs text-red-600 font-medium">
+                Tanggal mulai tidak boleh melebihi tanggal selesai.
+              </p>
+            )}
+
+            <div className="pt-2">
+              <label className="inline-flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sertakanTanpaKasus}
+                  onChange={(e) => setSertakanTanpaKasus(e.target.checked)}
+                  className="rounded border-gray-300 text-[#4A6FA5] focus:ring-[#4A6FA5]"
+                />
+                <span className="font-medium">Sertakan siswa tanpa pelanggaran</span>
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-200/60">
+              <span className="text-xs text-gray-500">
+                {loadingLaporan ? (
+                  'Memuat data siswa dan kasus...'
+                ) : (
+                  <>
+                    Menyiapkan <strong>{daftarLaporan.length}</strong> lembar siswa ({periodeLabelLaporan})
+                  </>
+                )}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportExcelLaporanKelas}
+                  disabled={loadingLaporan || isLaporanDateInvalid || exportingExcelLaporan || daftarLaporan.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>{exportingExcelLaporan ? 'Mengekspor...' : 'Export Excel'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintLaporanKelas}
+                  disabled={loadingLaporan || isLaporanDateInvalid || daftarLaporan.length === 0}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white rounded-lg text-xs font-semibold shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak A4</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLaporanKelasModal(false)}
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Area Cetak Dokumen */}
+          <div
+            id="printable-laporan-content"
+            className="surat-resmi bg-white text-black p-8 sm:p-12 border border-gray-300 shadow-md rounded-lg max-w-full text-xs leading-normal"
+          >
+            {loadingLaporan ? (
+              <div className="py-12 text-center text-gray-500 no-print">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-[#4A6FA5]" />
+                <p>Memuat rekapitulasi data kelas {selectedKelas}...</p>
+              </div>
+            ) : laporanKelasData.siswaList?.length === 0 ? (
+              <div className="py-12 text-center text-gray-500">
+                <p>Tidak ada siswa aktif pada kelas ini.</p>
+              </div>
+            ) : daftarLaporan.length === 0 ? (
+              <div className="py-12 text-center text-gray-500">
+                <p>Seluruh siswa aktif di kelas ini bersih dari pelanggaran pada periode terkait.</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Centang "Sertakan siswa tanpa pelanggaran" untuk tetap mencetak lembar kosong mereka.
+                </p>
+              </div>
+            ) : (
+              <LaporanKelas
+                daftar={daftarLaporan}
+                settings={laporanKelasData.settings}
+                user={user}
+                periodeLabel={periodeLabelLaporan}
+              />
+            )}
+          </div>
+        </div>
+      </Modal>
     </AppLayout>
   );
 }

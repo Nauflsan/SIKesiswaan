@@ -46,6 +46,8 @@ export default function Log() {
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Hapus Permanen</span>;
       case 'buat_surat':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Surat SP</span>;
+      case 'cetak_laporan':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">Laporan</span>;
       case 'edit_user':
       case 'ganti_sandi':
       case 'reset_sandi':

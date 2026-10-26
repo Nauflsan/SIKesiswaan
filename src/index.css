@@ -175,6 +175,16 @@
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
+
+  /* Laporan per kelas: satu siswa per halaman */
+  .surat-resmi .laporan-halaman {
+    break-after: page;
+    page-break-after: always;
+  }
+  .surat-resmi .laporan-halaman:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
 }
 
 /* ========================================================================== */

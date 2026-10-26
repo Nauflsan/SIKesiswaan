@@ -307,6 +307,52 @@ export const firebaseKasusService = {
   },
 
   /**
+   * Mengambil riwayat kasus untuk banyak siswa sekaligus (batch chunks max 30 per in-query).
+   * Menghindari full-scan koleksi saat membuat laporan kedisiplinan satu kelas.
+   * Query sengaja tanpa orderBy untuk mencegah kebutuhan indeks komposit Firestore.
+   *
+   * @param {string[]} daftarId - Array ID siswa
+   * @param {Object} [options]
+   * @param {boolean} [options.includeDeleted=false]
+   * @returns {Promise<Array>}
+   */
+  getBySiswaIds: async (daftarId, { includeDeleted = false } = {}) => {
+    if (!Array.isArray(daftarId) || daftarId.length === 0) return [];
+
+    const validIds = Array.from(new Set(daftarId.filter(Boolean)));
+    if (validIds.length === 0) return [];
+
+    const chunks = [];
+    for (let i = 0; i < validIds.length; i += 30) {
+      chunks.push(validIds.slice(i, i + 30));
+    }
+
+    const snaps = await Promise.all(
+      chunks.map(chunk =>
+        getDocs(
+          query(
+            collection(db, COLLECTION_NAME),
+            where('siswaId', 'in', chunk)
+          )
+        )
+      )
+    );
+
+    let list = [];
+    snaps.forEach(snap => {
+      snap.docs.forEach(d => {
+        list.push({ id: d.id, ...d.data() });
+      });
+    });
+
+    if (!includeDeleted) {
+      list = list.filter(k => !k.deletedAt);
+    }
+
+    return list.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+  },
+
+  /**
    * Mengambil kasus berdasarkan status tertentu (misal: 'baru' untuk dashboard).
    *
    * @param {string} status - 'baru' | 'dalam_pembinaan' | 'selesai'
