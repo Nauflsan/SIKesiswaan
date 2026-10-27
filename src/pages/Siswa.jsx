@@ -28,7 +28,7 @@ import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import { siswaService, kelasService, kasusService, suratService, settingsService, logService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
-import { DEFAULT_KELAS, formatTanggal, getRentangPeriodePreset, ambilKodeKelas, bangunPetaJurusan } from '../lib/helpers.js';
+import { DEFAULT_KELAS, formatTanggal, getRentangPeriodePreset, ambilKodeKelas, bangunPetaJurusan, normalisasiKelas, bangunPetaAngkatan } from '../lib/helpers.js';
 import { filterKasusPeriode, eksporLaporanExcel } from '../lib/laporan.js';
 import LaporanKelas from '../components/print/LaporanKelas.jsx';
 import { useAuthStore } from '../stores/authStore.js';
@@ -68,6 +68,7 @@ export default function Siswa() {
   );
 
   const petaJurusan = useMemo(() => bangunPetaJurusan(rawSiswaList), [rawSiswaList]);
+  const petaAngkatan = useMemo(() => bangunPetaAngkatan(rawSiswaList), [rawSiswaList]);
   const daftarJurusan = useMemo(() => {
     const set = new Set();
     for (const s of rawSiswaList) {
@@ -82,12 +83,13 @@ export default function Siswa() {
   // State modal penambahan siswa baru
   const [showAddModal, setShowAddModal] = useState(false);
   const [jurusanManual, setJurusanManual] = useState(false);
+  const [angkatanManual, setAngkatanManual] = useState(false);
   const [newSiswa, setNewSiswa] = useState({
     nisn: '',
     nama: '',
     kelas: '',
     jurusan: '',
-    angkatan: 2024
+    angkatan: ''
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -234,12 +236,14 @@ export default function Siswa() {
     const kode = ambilKodeKelas(initialKelas);
     const initialJurusan = (kode && petaJurusan[kode]) || '';
     setJurusanManual(false);
+    setAngkatanManual(false);
     setNewSiswa(prev => ({
       ...prev,
       nisn: '',
       nama: '',
       kelas: initialKelas,
-      jurusan: initialJurusan
+      jurusan: initialJurusan,
+      angkatan: petaAngkatan[normalisasiKelas(initialKelas)] ?? ''
     }));
     setShowAddModal(true);
   };
@@ -258,6 +262,12 @@ export default function Siswa() {
     const trimmedNisn = (newSiswa.nisn || '').trim();
     if (!trimmedNisn) {
       showToast('NISN tidak boleh kosong', 'error');
+      return;
+    }
+
+    const angkatanNum = Number(newSiswa.angkatan);
+    if (!Number.isInteger(angkatanNum) || angkatanNum < 2000 || angkatanNum > 2100) {
+      showToast('Tahun angkatan wajib diisi (antara 2000 dan 2100)', 'error');
       return;
     }
 
@@ -298,13 +308,16 @@ export default function Siswa() {
 
       const petaBaru = bangunPetaJurusan([...freshAktif, ...nonAktifList]);
       const nextKode = ambilKodeKelas(finalKelas);
+      const petaAngkatanBaru = bangunPetaAngkatan([...freshAktif, ...nonAktifList]);
       setJurusanManual(false);
+      setAngkatanManual(false);
       setNewSiswa(prev => ({
         ...prev,
         nisn: '',
         nama: '',
         kelas: finalKelas,
-        jurusan: (nextKode && (petaBaru[nextKode] || petaJurusan[nextKode])) || ''
+        jurusan: (nextKode && (petaBaru[nextKode] || petaJurusan[nextKode])) || '',
+        angkatan: petaAngkatanBaru[normalisasiKelas(finalKelas)] ?? ''
       }));
     } catch (err) {
       showToast(err.message || 'Gagal menambahkan siswa', 'error');
@@ -668,7 +681,8 @@ export default function Siswa() {
                   setNewSiswa(prev => ({
                     ...prev,
                     kelas: val,
-                    jurusan: jurusanManual ? prev.jurusan : ((kode && petaJurusan[kode]) || '')
+                    jurusan: jurusanManual ? prev.jurusan : ((kode && petaJurusan[kode]) || ''),
+                    angkatan: angkatanManual ? prev.angkatan : (petaAngkatan[normalisasiKelas(val)] ?? '')
                   }));
                 }}
                 options={distinctKelas}
@@ -680,14 +694,37 @@ export default function Siswa() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
-                  Tahun Angkatan
+                  Tahun Angkatan <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
+                  placeholder="Contoh: 2025"
                   value={newSiswa.angkatan}
-                  onChange={(e) => setNewSiswa({ ...newSiswa, angkatan: Number(e.target.value) })}
+                  onInput={(e) => {
+                    setAngkatanManual(true);
+                    const v = e.target.value;
+                    setNewSiswa(prev => ({ ...prev, angkatan: v === '' ? '' : Number(v) }));
+                  }}
                   className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl"
                 />
+                {(() => {
+                  if (!newSiswa.kelas) return null;
+                  if (!angkatanManual && newSiswa.angkatan !== '') {
+                    return (
+                      <span className="text-[10px] text-gray-400 mt-1 block">
+                        Terisi otomatis dari siswa lain di kelas ini. Bisa diubah.
+                      </span>
+                    );
+                  }
+                  if (newSiswa.angkatan === '') {
+                    return (
+                      <span className="text-[10px] text-gray-400 mt-1 block">
+                        Belum ada siswa di kelas ini. Isi tahun angkatan.
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 

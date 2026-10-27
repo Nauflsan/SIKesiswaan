@@ -271,6 +271,34 @@ export const bangunPetaJurusan = (daftarSiswa) => {
 };
 
 /**
+ * Menormalkan nama kelas untuk kunci pencarian: 'xi  tkj 1' -> 'XI TKJ 1'.
+ */
+export const normalisasiKelas = (kelas) =>
+  String(kelas || '').trim().replace(/\s+/g, ' ').toUpperCase();
+
+/**
+ * Membangun peta { 'XI TKJ 1': 2025 } dari daftar siswa.
+ * Angkatan tidak valid (di luar 2000-2100) diabaikan. Bila satu kelas punya
+ * beberapa angkatan, dipilih yang paling banyak (seri: yang lebih baru).
+ */
+export const bangunPetaAngkatan = (daftarSiswa) => {
+  const hitung = {};
+  for (const s of daftarSiswa || []) {
+    const kelas = normalisasiKelas(s.kelas);
+    const angkatan = Number(s.angkatan);
+    if (!kelas || !Number.isInteger(angkatan) || angkatan < 2000 || angkatan > 2100) continue;
+    (hitung[kelas] ||= {})[angkatan] = (hitung[kelas][angkatan] || 0) + 1;
+  }
+  const peta = {};
+  for (const [kelas, daftar] of Object.entries(hitung)) {
+    peta[kelas] = Number(
+      Object.entries(daftar).sort((a, b) => b[1] - a[1] || Number(b[0]) - Number(a[0]))[0][0]
+    );
+  }
+  return peta;
+};
+
+/**
  * Menyarankan kelas tujuan saat naik kelas.
  * 'X TKJ 1' -> 'XI TKJ 1', 'XI TKJ 1' -> 'XII TKJ 1', 'XII ...' -> null (lulus).
  * Kelas yang tidak cocok pola dikembalikan sebagai undefined (pengguna memilih sendiri).
