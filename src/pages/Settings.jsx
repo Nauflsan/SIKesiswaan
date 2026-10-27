@@ -48,6 +48,7 @@ import {
   Wrench
 } from "lucide-preact";
 import NaikKelasPanel from "../components/maintenance/NaikKelasPanel.jsx";
+import BersihkanLulusanPanel from "../components/maintenance/BersihkanLulusanPanel.jsx";
 
 export default function Settings() {
   const {
@@ -1217,7 +1218,10 @@ export default function Settings() {
       )}
 
       {activeTab === "pemeliharaan" && (
-        <NaikKelasPanel />
+        <div className="max-w-3xl space-y-6">
+          <NaikKelasPanel />
+          <BersihkanLulusanPanel />
+        </div>
       )}
     </AppLayout>
   );

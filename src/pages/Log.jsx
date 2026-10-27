@@ -60,6 +60,8 @@ export default function Log() {
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">Naik Kelas</span>;
       case 'batal_naik_kelas':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Batal Naik Kelas</span>;
+      case 'bersihkan_lulusan':
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Bersihkan Lulusan</span>;
       case 'import_siswa':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800">Import Excel</span>;
       default:
