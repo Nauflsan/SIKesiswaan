@@ -222,7 +222,8 @@ export const firebaseMaintenanceService = {
       // Hitung ulang masa simpan
       const batasIso = data.tanggalNonaktif || data.updatedAt || data.createdAt || now.toISOString();
       const layakSejak = tambahBulanKalender(new Date(batasIso), masaSimpanBulan);
-      if (layakSejak.getTime() > now.getTime()) {
+      // Pola !(<=) sengaja: tanggal rusak (NaN) harus ditolak, bukan lolos
+      if (!(layakSejak.getTime() <= now.getTime())) {
         throw new Error('Data berubah sejak pencarian. Muat ulang kandidat lalu coba lagi.');
       }
     }

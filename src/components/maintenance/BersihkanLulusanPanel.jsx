@@ -8,7 +8,7 @@
  * - Penghitungan dampak penghapusan (siswa, kasus, soft-deleted kasus, surat).
  * - Pengunduhan arsip spreadsheet (.xlsx) wajib 3-sheet sebelum penghapusan.
  * - Konfirmasi ketik 'HAPUS PERMANEN' dengan proteksi berlapis.
- * - Penghapusan massal atomik bertahap per 400 dokumen via writeBatch.
+ * - Penghapusan massal bertahap per 400 dokumen via writeBatch (tiap batch atomik, keseluruhan proses tidak).
  */
 
 import { useState, useEffect, useMemo } from 'preact/hooks';
@@ -26,8 +26,6 @@ import {
   CheckCircle2,
   Save,
   Clock,
-  ShieldAlert,
-  Users,
   CheckSquare,
   Square,
   RefreshCw
@@ -96,7 +94,9 @@ export default function BersihkanLulusanPanel() {
   };
 
   // Cari kandidat siswa tidak aktif berdasarkan masa simpan
-  const handleCariKandidat = async () => {
+  // opsi.senyap: dipakai setelah hapus sukses agar toast ringkasan hasil tidak tertimpa
+  const handleCariKandidat = async (opsi) => {
+    const senyap = opsi?.senyap === true;
     if (loadingKandidat || processingHapus) return;
     setLoadingKandidat(true);
     try {
@@ -115,10 +115,12 @@ export default function BersihkanLulusanPanel() {
       setConfirmText('');
       setProgressInfo(null);
 
-      if ((res.layak || []).length === 0) {
-        showToast('Tidak ada siswa tidak aktif yang memenuhi syarat masa simpan', 'info');
-      } else {
-        showToast(`Ditemukan ${res.layak.length} siswa layak dibersihkan`, 'success');
+      if (!senyap) {
+        if ((res.layak || []).length === 0) {
+          showToast('Tidak ada siswa tidak aktif yang memenuhi syarat masa simpan', 'info');
+        } else {
+          showToast(`Ditemukan ${res.layak.length} siswa layak dibersihkan`, 'success');
+        }
       }
     } catch (err) {
       showToast('Gagal mencari kandidat: ' + friendlyError(err, 'Terjadi kesalahan sistem'), 'error');
@@ -291,7 +293,7 @@ export default function BersihkanLulusanPanel() {
     }
 
     setProcessingHapus(true);
-    setProgressInfo({ tahap: 'Verifikasi', selesai: 0, total: selectedIds.size });
+    setProgressInfo({ tahap: '', selesai: 0, total: 0 });
 
     try {
       const res = await maintenanceService.hapusPermanenLulusan(
@@ -321,7 +323,7 @@ export default function BersihkanLulusanPanel() {
       setProgressInfo(null);
 
       // Muat ulang daftar kandidat
-      await handleCariKandidat();
+      await handleCariKandidat({ senyap: true });
     } catch (err) {
       showToast(
         'Gagal membersihkan data: ' + friendlyError(err, 'Terjadi kesalahan sistem'),
