@@ -28,7 +28,7 @@ import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
 import { siswaService, kelasService, kasusService, suratService, settingsService, logService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
-import { DEFAULT_KELAS, formatTanggal, getRentangPeriodePreset } from '../lib/helpers.js';
+import { DEFAULT_KELAS, formatTanggal, getRentangPeriodePreset, ambilKodeKelas, bangunPetaJurusan } from '../lib/helpers.js';
 import { filterKasusPeriode, eksporLaporanExcel } from '../lib/laporan.js';
 import LaporanKelas from '../components/print/LaporanKelas.jsx';
 import { useAuthStore } from '../stores/authStore.js';
@@ -67,13 +67,26 @@ export default function Siswa() {
     [aktifList, nonAktifList]
   );
 
+  const petaJurusan = useMemo(() => bangunPetaJurusan(rawSiswaList), [rawSiswaList]);
+  const daftarJurusan = useMemo(() => {
+    const set = new Set();
+    for (const s of rawSiswaList) {
+      const jur = String(s.jurusan || '').trim().replace(/\s+/g, ' ');
+      if (jur && jur.toLowerCase() !== 'umum') {
+        set.add(jur);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'id'));
+  }, [rawSiswaList]);
+
   // State modal penambahan siswa baru
   const [showAddModal, setShowAddModal] = useState(false);
+  const [jurusanManual, setJurusanManual] = useState(false);
   const [newSiswa, setNewSiswa] = useState({
     nisn: '',
     nama: '',
-    kelas: 'XI TKJ 1',
-    jurusan: 'Teknik Komputer dan Jaringan',
+    kelas: '',
+    jurusan: '',
     angkatan: 2024
   });
   const [submitting, setSubmitting] = useState(false);
@@ -214,6 +227,24 @@ export default function Siswa() {
   ])).sort(), [kelasList, rawSiswaList]);
 
   /**
+   * Membuka modal tambah siswa dengan inisialisasi kelas dan jurusan otomatis
+   */
+  const handleOpenAddModal = () => {
+    const initialKelas = selectedKelas !== 'semua' ? selectedKelas : '';
+    const kode = ambilKodeKelas(initialKelas);
+    const initialJurusan = (kode && petaJurusan[kode]) || '';
+    setJurusanManual(false);
+    setNewSiswa(prev => ({
+      ...prev,
+      nisn: '',
+      nama: '',
+      kelas: initialKelas,
+      jurusan: initialJurusan
+    }));
+    setShowAddModal(true);
+  };
+
+  /**
    * Handler penambahan siswa baru ke database
    */
   const handleAddSiswa = async (e) => {
@@ -260,11 +291,21 @@ export default function Siswa() {
 
       showToast(`Siswa ${newSiswa.nama} (${finalKelas}) berhasil didaftarkan!`, 'success');
       setShowAddModal(false);
-      setNewSiswa({ nisn: '', nama: '', kelas: finalKelas, jurusan: 'Teknik Komputer dan Jaringan', angkatan: 2024 });
 
       // Cukup perbarui dari cache siswa aktif (0 read Firestore)
       const freshAktif = await siswaService.getAktif();
       setAktifList(freshAktif);
+
+      const petaBaru = bangunPetaJurusan([...freshAktif, ...nonAktifList]);
+      const nextKode = ambilKodeKelas(finalKelas);
+      setJurusanManual(false);
+      setNewSiswa(prev => ({
+        ...prev,
+        nisn: '',
+        nama: '',
+        kelas: finalKelas,
+        jurusan: (nextKode && (petaBaru[nextKode] || petaJurusan[nextKode])) || ''
+      }));
     } catch (err) {
       showToast(err.message || 'Gagal menambahkan siswa', 'error');
     } finally {
@@ -458,7 +499,7 @@ export default function Siswa() {
           )}
           {(user?.role === 'admin' || user?.role === 'guru_bk') && (
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={handleOpenAddModal}
               className="inline-flex items-center gap-2 px-4 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-semibold rounded-xl shadow-xs transition-all"
             >
               <UserPlus className="w-4 h-4" />
@@ -622,7 +663,14 @@ export default function Siswa() {
               </label>
               <CreatableCombobox
                 value={newSiswa.kelas}
-                onChange={(val) => setNewSiswa({ ...newSiswa, kelas: val })}
+                onChange={(val) => {
+                  const kode = ambilKodeKelas(val);
+                  setNewSiswa(prev => ({
+                    ...prev,
+                    kelas: val,
+                    jurusan: jurusanManual ? prev.jurusan : ((kode && petaJurusan[kode]) || '')
+                  }));
+                }}
                 options={distinctKelas}
                 placeholder="Pilih atau ketik kelas baru..."
                 creatable={true}
@@ -650,14 +698,36 @@ export default function Siswa() {
               <input
                 type="text"
                 list="jurusan-options"
-                placeholder="Ketik atau pilih jurusan (contoh: Teknik Komputer dan Jaringan)"
+                placeholder="Ketik atau pilih jurusan"
                 value={newSiswa.jurusan}
-                onInput={(e) => setNewSiswa({ ...newSiswa, jurusan: e.target.value })}
+                onInput={(e) => {
+                  setJurusanManual(true);
+                  setNewSiswa(prev => ({ ...prev, jurusan: e.target.value }));
+                }}
                 className="w-full text-sm py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-[#4A6FA5]"
               />
+              {(() => {
+                const kode = ambilKodeKelas(newSiswa.kelas);
+                if (!jurusanManual && kode && newSiswa.jurusan) {
+                  return (
+                    <span className="text-[10px] text-gray-400 mt-1 block">
+                      Terisi otomatis dari kode kelas {kode}. Bisa diubah.
+                    </span>
+                  );
+                }
+                if (!newSiswa.jurusan && kode && !petaJurusan[kode]) {
+                  return (
+                    <span className="text-[10px] text-gray-400 mt-1 block">
+                      Kode {kode} belum dikenal. Ketik jurusannya, kelas berikutnya akan terisi otomatis.
+                    </span>
+                  );
+                }
+                return null;
+              })()}
               <datalist id="jurusan-options">
-                <option value="Teknik Komputer dan Jaringan" />
-                <option value="Teknik Kendaraan Ringan" />
+                {daftarJurusan.map(j => (
+                  <option key={j} value={j} />
+                ))}
               </datalist>
             </div>
 

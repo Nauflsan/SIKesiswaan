@@ -236,6 +236,41 @@ export const DEFAULT_KELAS = [
 ];
 
 /**
+ * Mengambil kode jurusan dari nama kelas.
+ * 'XI TKJ 1' -> 'TKJ', 'XII MM 2' -> 'MM'. Tidak cocok pola -> null.
+ */
+export const ambilKodeKelas = (kelas) => {
+  const m = String(kelas || "")
+    .trim()
+    .match(/^(?:XII|XI|X)\s+(.+?)(?:\s+\d+)?$/i);
+  return m ? m[1].trim().toUpperCase() : null;
+};
+
+/**
+ * Membangun peta { KODE: 'Nama Jurusan' } dari daftar siswa.
+ * Jurusan kosong atau 'Umum' diabaikan. Bila satu kode punya beberapa
+ * jurusan, dipilih yang paling banyak (seri: urut abjad).
+ */
+export const bangunPetaJurusan = (daftarSiswa) => {
+  const hitung = {};
+  for (const s of daftarSiswa || []) {
+    const kode = ambilKodeKelas(s.kelas);
+    const jur = String(s.jurusan || "")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (!kode || !jur || jur.toLowerCase() === "umum") continue;
+    (hitung[kode] ||= {})[jur] = (hitung[kode][jur] || 0) + 1;
+  }
+  const peta = {};
+  for (const [kode, jurs] of Object.entries(hitung)) {
+    peta[kode] = Object.entries(jurs).sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "id"),
+    )[0][0];
+  }
+  return peta;
+};
+
+/**
  * Menyarankan kelas tujuan saat naik kelas.
  * 'X TKJ 1' -> 'XI TKJ 1', 'XI TKJ 1' -> 'XII TKJ 1', 'XII ...' -> null (lulus).
  * Kelas yang tidak cocok pola dikembalikan sebagai undefined (pengguna memilih sendiri).
