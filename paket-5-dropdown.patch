@@ -1,0 +1,21 @@
+diff --git a/src/components/maintenance/NaikKelasPanel.jsx b/src/components/maintenance/NaikKelasPanel.jsx
+index 397f4d5..ba6cd5d 100644
+--- a/src/components/maintenance/NaikKelasPanel.jsx
++++ b/src/components/maintenance/NaikKelasPanel.jsx
+@@ -368,13 +368,13 @@ export default function NaikKelasPanel() {
+               </p>
+             ) : (
+               <>
+-                <div className="overflow-x-auto">
+-                  <table className="w-full text-left text-xs border border-gray-200 rounded-xl overflow-hidden">
++                <div>
++                  <table className="w-full text-left text-xs border border-gray-200 rounded-xl">
+                     <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider text-[11px] font-semibold">
+                       <tr>
+                         <th className="py-2.5 px-3">Kelas Asal</th>
+                         <th className="py-2.5 px-3 text-center">Jumlah Siswa</th>
+-                        <th className="py-2.5 px-3 w-64">Kelas Tujuan</th>
++                        <th className="py-2.5 px-3 w-48 sm:w-64">Kelas Tujuan</th>
+                       </tr>
+                     </thead>
+                     <tbody className="divide-y divide-gray-100 bg-white">
