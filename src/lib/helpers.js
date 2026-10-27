@@ -234,3 +234,21 @@ export const DEFAULT_KELAS = [
   'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
   'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2'
 ];
+
+/**
+ * Menyarankan kelas tujuan saat naik kelas.
+ * 'X TKJ 1' -> 'XI TKJ 1', 'XI TKJ 1' -> 'XII TKJ 1', 'XII ...' -> null (lulus).
+ * Kelas yang tidak cocok pola dikembalikan sebagai undefined (pengguna memilih sendiri).
+ *
+ * @param {string} kelas - Nama kelas asal
+ * @returns {string|null|undefined}
+ */
+export const sarankanKelasBaru = (kelas) => {
+  const m = String(kelas || '').trim().match(/^(XII|XI|X)(\s+.*)?$/i);
+  if (!m) return undefined;
+  const tingkat = m[1].toUpperCase();
+  const sisa = m[2] || '';
+  if (tingkat === 'X') return 'XI' + sisa;
+  if (tingkat === 'XI') return 'XII' + sisa;
+  return null; // XII -> lulus
+};

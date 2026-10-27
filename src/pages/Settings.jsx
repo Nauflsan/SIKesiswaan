@@ -44,8 +44,10 @@ import {
   ArrowRight,
   Database,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Wrench
 } from "lucide-preact";
+import NaikKelasPanel from "../components/maintenance/NaikKelasPanel.jsx";
 
 export default function Settings() {
   const {
@@ -348,7 +350,7 @@ export default function Settings() {
         </button>
         <button
           onClick={() => setActiveTab("database")}
-          className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+          className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === "database"
               ? "border-[#4A6FA5] text-[#4A6FA5]"
               : "border-transparent text-gray-400 hover:text-gray-700"
@@ -356,6 +358,17 @@ export default function Settings() {
         >
           <Cloud className="w-4 h-4" />
           <span>Status Cloud Database</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("pemeliharaan")}
+          className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "pemeliharaan"
+              ? "border-[#4A6FA5] text-[#4A6FA5]"
+              : "border-transparent text-gray-400 hover:text-gray-700"
+          }`}
+        >
+          <Wrench className="w-4 h-4" />
+          <span>Pemeliharaan Data</span>
         </button>
       </div>
 
@@ -1201,6 +1214,10 @@ export default function Settings() {
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === "pemeliharaan" && (
+        <NaikKelasPanel />
       )}
     </AppLayout>
   );

@@ -25,6 +25,7 @@ import { firebaseLogService } from './log.js';
 import { siswaCache } from './siswaCache.js';
 
 const COLLECTION_NAME = 'siswa';
+const META_NAIK_KELAS_REF = doc(db, 'meta', 'naikKelasTerakhir');
 
 export const firebaseSiswaService = {
   /**
@@ -298,6 +299,22 @@ export const firebaseSiswaService = {
       ...data,
       updatedAt: new Date().toISOString()
     };
+
+    // Stamping tanggalNonaktif saat status siswa berubah non-aktif (khusus jika ada statusSiswa di data)
+    if (data.statusSiswa !== undefined) {
+      const snapBefore = await getDoc(docRef);
+      if (snapBefore.exists()) {
+        const oldDoc = snapBefore.data();
+        const oldStatus = oldDoc.statusSiswa || 'aktif';
+        if (['lulus', 'pindah', 'keluar'].includes(data.statusSiswa)) {
+          if (!oldDoc.tanggalNonaktif || oldStatus === 'aktif') {
+            updateData.tanggalNonaktif = new Date().toISOString();
+          }
+        } else if (data.statusSiswa === 'aktif') {
+          updateData.tanggalNonaktif = null;
+        }
+      }
+    }
 
     await updateDoc(docRef, updateData);
     const snap = await getDoc(docRef);
@@ -626,5 +643,261 @@ export const firebaseSiswaService = {
     });
 
     return true;
+  },
+
+  /**
+   * Menjalankan pemindahan kelas massal siswa aktif di awal tahun ajaran.
+   * Siswa yang naik kelas diperbarui kelasnya, sedangkan kelas tujuan '__LULUS__' disetel lulus.
+   * Seluruh perubahan dihitung dari snapshot awal dan dicadangkan ke meta/naikKelasTerakhir sebelum penulisan.
+   *
+   * @param {Array<{ kelasAsal: string, kelasTujuan: string }>} pemetaan
+   * @param {Object} currentUser
+   * @returns {Promise<{ total: number, naik: number, lulus: number, rincian: Array }>}
+   */
+  naikKelasMassal: async (pemetaan, currentUser) => {
+    if (!Array.isArray(pemetaan) || pemetaan.length === 0) {
+      throw new Error('Pemetaan kelas tidak boleh kosong');
+    }
+
+    const seenAsal = new Set();
+    const mapTujuan = new Map();
+
+    for (const p of pemetaan) {
+      if (!p.kelasAsal || !p.kelasTujuan) {
+        throw new Error('Kelas asal dan kelas tujuan wajib diisi');
+      }
+      if (seenAsal.has(p.kelasAsal)) {
+        throw new Error(`Kelas asal ganda terdeteksi: ${p.kelasAsal}`);
+      }
+      seenAsal.add(p.kelasAsal);
+
+      // Abaikan kelas yang tidak diproses atau tujuannya sama persis dengan asal
+      if (p.kelasTujuan !== '__SKIP__' && p.kelasAsal !== p.kelasTujuan) {
+        mapTujuan.set(p.kelasAsal, p.kelasTujuan);
+      }
+    }
+
+    if (mapTujuan.size === 0) {
+      throw new Error('Tidak ada kelas yang diproses (semua kelas dilewati atau tujuan sama dengan asal)');
+    }
+
+    // 2. Ambil data siswa aktif yang segar (force: true)
+    const aktif = await firebaseSiswaService.getAktif({ force: true });
+
+    // 3. Tentukan perubahan SEMUA siswa dari snapshot awal sebelum menulis apa pun
+    const nowIso = new Date().toISOString();
+    const perubahanSiswa = [];
+    const riwayat = [];
+    const rincianMap = new Map();
+    let naikCount = 0;
+    let lulusCount = 0;
+
+    aktif.forEach(siswa => {
+      if (mapTujuan.has(siswa.kelas)) {
+        const tujuan = mapTujuan.get(siswa.kelas);
+        const asal = siswa.kelas;
+        const isLulus = tujuan === '__LULUS__';
+
+        riwayat.push({
+          id: siswa.id,
+          kelasLama: asal,
+          statusLama: 'aktif'
+        });
+
+        if (isLulus) {
+          lulusCount++;
+          perubahanSiswa.push({
+            id: siswa.id,
+            updateData: {
+              statusSiswa: 'lulus',
+              tanggalNonaktif: nowIso,
+              updatedAt: nowIso
+            }
+          });
+        } else {
+          naikCount++;
+          perubahanSiswa.push({
+            id: siswa.id,
+            updateData: {
+              kelas: tujuan,
+              updatedAt: nowIso
+            }
+          });
+        }
+
+        const labelTujuan = isLulus ? 'Lulus' : tujuan;
+        const key = `${asal}->${labelTujuan}`;
+        if (rincianMap.has(key)) {
+          rincianMap.get(key).jumlah++;
+        } else {
+          rincianMap.set(key, { asal, tujuan: labelTujuan, jumlah: 1 });
+        }
+      }
+    });
+
+    const total = perubahanSiswa.length;
+    if (total === 0) {
+      throw new Error('Tidak ada siswa aktif yang cocok dengan pemetaan kelas yang dipilih');
+    }
+    if (riwayat.length > 3000) {
+      throw new Error('Terlalu banyak siswa; hubungi pengembang');
+    }
+
+    const rincianArray = Array.from(rincianMap.values());
+    const rincianStr = rincianArray.map(r => `${r.asal} -> ${r.tujuan}: ${r.jumlah}`).join('; ');
+    const ringkasan = `${total} siswa diproses (${naikCount} naik kelas, ${lulusCount} lulus)`;
+
+    // 4. Simpan riwayat pembatalan SEBELUM melakukan penulisan apa pun
+    await setDoc(META_NAIK_KELAS_REF, {
+      waktu: nowIso,
+      oleh: currentUser?.nama || 'Admin',
+      ringkasan,
+      jumlah: total,
+      perubahan: riwayat,
+      dibatalkan: false
+    });
+
+    // 5. Tulis perubahan siswa dengan writeBatch per 400 dokumen
+    for (let i = 0; i < total; i += 400) {
+      const chunk = perubahanSiswa.slice(i, i + 400);
+      const batch = writeBatch(db);
+      chunk.forEach(item => {
+        const ref = doc(db, COLLECTION_NAME, item.id);
+        batch.update(ref, item.updateData);
+      });
+      await batch.commit();
+    }
+
+    // 6. Bersihkan in-memory cache siswa aktif
+    siswaCache.clear();
+
+    // 7. Catat audit trail log aktivitas
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'naik_kelas',
+      detail: `Naik kelas massal: ${total} siswa diproses (${rincianStr}; lulus: ${lulusCount})`,
+      targetId: 'naik_kelas_massal',
+      targetType: 'siswa'
+    });
+
+    return {
+      total,
+      naik: naikCount,
+      lulus: lulusCount,
+      rincian: rincianArray
+    };
+  },
+
+  /**
+   * Mengambil metadata riwayat proses naik kelas massal terakhir (tanpa array perubahan).
+   *
+   * @returns {Promise<{ waktu: string, oleh: string, ringkasan: string, jumlah: number, dibatalkan: boolean } | null>}
+   */
+  getRiwayatNaikKelasTerakhir: async () => {
+    const snap = await getDoc(META_NAIK_KELAS_REF);
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return {
+      waktu: data.waktu,
+      oleh: data.oleh,
+      ringkasan: data.ringkasan,
+      jumlah: data.jumlah !== undefined ? data.jumlah : (Array.isArray(data.perubahan) ? data.perubahan.length : 0),
+      dibatalkan: Boolean(data.dibatalkan)
+    };
+  },
+
+  /**
+   * Membatalkan proses naik kelas massal terakhir dan mengembalikan kelas serta status siswa semula.
+   * Tahan terhadap siswa yang telah dihapus permanen (dilewati dengan penghitungan terpisah).
+   *
+   * @param {Object} currentUser
+   * @returns {Promise<{ dipulihkan: number, dilewati: number }>}
+   */
+  batalkanNaikKelasTerakhir: async (currentUser) => {
+    const snap = await getDoc(META_NAIK_KELAS_REF);
+    if (!snap.exists()) {
+      throw new Error('Riwayat naik kelas tidak ditemukan');
+    }
+
+    const data = snap.data();
+    if (data.dibatalkan) {
+      throw new Error('Proses naik kelas ini sudah dibatalkan sebelumnya');
+    }
+
+    const waktuMillis = new Date(data.waktu).getTime();
+    const diffDays = (Date.now() - waktuMillis) / (1000 * 60 * 60 * 24);
+    if (isNaN(diffDays) || diffDays > 30) {
+      throw new Error('Riwayat naik kelas sudah lebih dari 30 hari dan tidak dapat dibatalkan');
+    }
+
+    if (!Array.isArray(data.perubahan) || data.perubahan.length === 0) {
+      throw new Error('Tidak ada data perubahan untuk dipulihkan');
+    }
+
+    const nowIso = new Date().toISOString();
+    let dipulihkan = 0;
+    let dilewati = 0;
+
+    // Pulihkan per batch 400. Jika batch gagal (misal ada dokumen hilang), fallback per dokumen
+    for (let i = 0; i < data.perubahan.length; i += 400) {
+      const chunk = data.perubahan.slice(i, i + 400);
+      try {
+        const batch = writeBatch(db);
+        chunk.forEach(item => {
+          const ref = doc(db, COLLECTION_NAME, item.id);
+          batch.update(ref, {
+            kelas: item.kelasLama,
+            statusSiswa: item.statusLama || 'aktif',
+            tanggalNonaktif: null,
+            updatedAt: nowIso
+          });
+        });
+        await batch.commit();
+        dipulihkan += chunk.length;
+      } catch {
+        // Fallback: proses satu per satu per dokumen dalam chunk tersebut
+        for (const item of chunk) {
+          const ref = doc(db, COLLECTION_NAME, item.id);
+          try {
+            await updateDoc(ref, {
+              kelas: item.kelasLama,
+              statusSiswa: item.statusLama || 'aktif',
+              tanggalNonaktif: null,
+              updatedAt: nowIso
+            });
+            dipulihkan++;
+          } catch (singleErr) {
+            const isNotFound = singleErr?.code === 'not-found' ||
+              (singleErr?.message && singleErr.message.toLowerCase().includes('no document to update'));
+            if (isNotFound) {
+              dilewati++;
+            } else {
+              throw new Error(`Gagal memulihkan sebagian data (sudah dipulihkan: ${dipulihkan} siswa): ${singleErr.message}`);
+            }
+          }
+        }
+      }
+    }
+
+    // Tandai riwayat telah dibatalkan
+    await updateDoc(META_NAIK_KELAS_REF, {
+      dibatalkan: true,
+      dibatalkanPada: nowIso,
+      dibatalkanOleh: currentUser?.nama || 'Admin'
+    });
+
+    siswaCache.clear();
+
+    await firebaseLogService.create({
+      userId: currentUser?.id,
+      userNama: currentUser?.nama,
+      aksi: 'batal_naik_kelas',
+      detail: `Pembatalan naik kelas: ${dipulihkan} siswa dipulihkan, ${dilewati} dilewati (sudah tidak ada)`,
+      targetId: 'naik_kelas_massal',
+      targetType: 'siswa'
+    });
+
+    return { dipulihkan, dilewati };
   }
 };
