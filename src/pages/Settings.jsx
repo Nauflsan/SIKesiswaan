@@ -350,7 +350,7 @@ export default function Settings() {
         </button>
         <button
           onClick={() => setActiveTab("database")}
-          className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
             activeTab === "database"
               ? "border-[#4A6FA5] text-[#4A6FA5]"
               : "border-transparent text-gray-400 hover:text-gray-700"

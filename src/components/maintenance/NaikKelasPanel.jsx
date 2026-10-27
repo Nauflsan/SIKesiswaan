@@ -184,7 +184,7 @@ export default function NaikKelasPanel() {
    */
   const handleDownloadBackup = async () => {
     if (siswaAktifList.length === 0) {
-      showToast('Tidak ada data siswa aktif untuk dicadangkan', 'warning');
+      showToast('Tidak ada data siswa aktif untuk dicadangkan', 'info');
       return;
     }
 
@@ -272,9 +272,12 @@ export default function NaikKelasPanel() {
     } catch (err) {
       showToast(
         'Gagal memproses naik kelas: ' +
-        friendlyError(err, 'Terjadi kesalahan sistem. Jika proses terputus, gunakan tombol Batalkan Naik Kelas Terakhir.'),
-        'error'
+        friendlyError(err, 'Terjadi kesalahan sistem.') +
+        ' Jika proses terputus di tengah jalan, gunakan tombol Batalkan Naik Kelas Terakhir.',
+        'error',
+        8000
       );
+      await loadRiwayatTerakhir();
     } finally {
       setProcessing(false);
     }

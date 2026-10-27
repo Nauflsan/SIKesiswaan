@@ -758,18 +758,20 @@ export const firebaseSiswaService = {
     });
 
     // 5. Tulis perubahan siswa dengan writeBatch per 400 dokumen
-    for (let i = 0; i < total; i += 400) {
-      const chunk = perubahanSiswa.slice(i, i + 400);
-      const batch = writeBatch(db);
-      chunk.forEach(item => {
-        const ref = doc(db, COLLECTION_NAME, item.id);
-        batch.update(ref, item.updateData);
-      });
-      await batch.commit();
+    try {
+      for (let i = 0; i < total; i += 400) {
+        const chunk = perubahanSiswa.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(item => {
+          const ref = doc(db, COLLECTION_NAME, item.id);
+          batch.update(ref, item.updateData);
+        });
+        await batch.commit();
+      }
+    } finally {
+      // 6. Bersihkan cache siswa aktif, juga saat gagal di tengah jalan (sebagian siswa mungkin sudah berpindah)
+      siswaCache.clear();
     }
-
-    // 6. Bersihkan in-memory cache siswa aktif
-    siswaCache.clear();
 
     // 7. Catat audit trail log aktivitas
     await firebaseLogService.create({
