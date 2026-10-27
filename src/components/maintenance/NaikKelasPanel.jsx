@@ -466,7 +466,7 @@ export default function NaikKelasPanel() {
                         Langkah 2: Konfirmasi Tindakan
                       </p>
                       <p className="text-gray-500 text-[11px] mt-0.5">
-                        Ketik <strong className="text-red-600 font-mono">NAIK KELAS</strong>pastikan capslock aktif pada kolom di bawah ini untuk mengaktifkan tombol eksekusi:
+                        Ketik <strong className="text-red-600 font-mono">NAIK KELAS</strong> pastikan capslock aktif pada kolom di bawah ini untuk mengaktifkan tombol eksekusi:
                       </p>
                     </div>
 
