@@ -122,7 +122,7 @@ export default function BottomNav() {
                 }}
                 className="text-[11px] text-gray-400 hover:text-[#4A6FA5] font-medium transition-colors cursor-pointer py-1"
               >
-                SIK-Kharisma v1.0.0 • Tentang Sistem
+                SIK-Kharisma v1.1.0 • Tentang Sistem
               </button>
             </div>
           </div>

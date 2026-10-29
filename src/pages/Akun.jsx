@@ -186,7 +186,7 @@ export default function Akun() {
               <span>Tentang Sistem & Hak Cipta</span>
             </h4>
             <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#4A6FA5] font-bold text-[10px]">
-              v1.0.0 (Release 2026)
+              v1.1.0 (Release 2026)
             </span>
           </div>
 

@@ -37,7 +37,7 @@ export default function AboutModal({ isOpen, onClose }) {
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className="px-2 py-0.5 rounded-md bg-blue-100/80 text-[#4A6FA5] font-bold text-[10px]">
-                Versi 1.0.0
+                Versi 1.1.0
               </span>
               <span className="text-[10px] text-gray-400 font-medium">
                 Rilis 2026

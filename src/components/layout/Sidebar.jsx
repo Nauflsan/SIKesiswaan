@@ -86,7 +86,7 @@ export default function Sidebar() {
               onClick={() => setShowAbout(true)}
               className="text-[11px] text-gray-400 hover:text-[#4A6FA5] font-medium transition-colors cursor-pointer"
             >
-              SIK-Kharisma v1.0.0 • Tentang
+              SIK-Kharisma v1.1.0 • Tentang
             </button>
           </div>
         </div>
