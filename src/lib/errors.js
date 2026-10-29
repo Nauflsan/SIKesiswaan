@@ -11,6 +11,9 @@ export function friendlyError(err, fallback = 'Terjadi kesalahan. Silakan coba l
   if (code.includes('unauthenticated')) {
     return 'Sesi berakhir. Silakan masuk kembali.';
   }
+  if (code.includes('resource-exhausted')) {
+    return 'Kuota harian database sedang habis. Coba lagi nanti (reset sekitar pukul 14.00 sampai 15.00 WIB) atau hubungi Administrator.';
+  }
   if (code.includes('unavailable') || code.includes('network') || code.includes('deadline-exceeded')) {
     return 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
   }
