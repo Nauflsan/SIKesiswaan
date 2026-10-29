@@ -20,7 +20,7 @@
  * =============================================================================
  */
 
-import { useState, useEffect, useMemo } from 'preact/hooks';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { Link } from 'wouter-preact';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import { KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
@@ -70,7 +70,10 @@ export default function Kasus() {
    * Mengambil data kasus berdasarkan periode yang dipilih.
    * Kategori dan pengaturan sekolah dimuat sekali saja saat mount untuk menghemat kuota Firestore.
    */
+  const loadSeq = useRef(0); // penanda permintaan terbaru agar respons lama tidak menimpa
+
   async function loadData(periodeToLoad = selectedPeriode) {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setLoadError(null);
     try {
@@ -96,13 +99,15 @@ export default function Kasus() {
           tanggalSelesai: rentang.tanggalSelesai
         });
       }
+      if (seq !== loadSeq.current) return;
       setRawKasusList(data);
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       const msg = friendlyError(err, 'Gagal memuat data kasus');
       setLoadError(msg);
       showToast(msg, 'error');
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }
 
@@ -325,7 +330,7 @@ export default function Kasus() {
                 <tr>
                   <td colSpan="7" className="py-12 text-center text-gray-400">
                     {loadError ? (
-                      <LoadError message={loadError} onRetry={loadData} />
+                      <LoadError message={loadError} onRetry={() => loadData(selectedPeriode)} />
                     ) : (
                       <div className="max-w-sm mx-auto space-y-2">
                         <AlertTriangle className="w-8 h-8 text-gray-300 mx-auto" />

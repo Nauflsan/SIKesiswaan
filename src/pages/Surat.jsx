@@ -22,7 +22,7 @@
  * =============================================================================
  */
 
-import { useState, useEffect, useMemo } from 'preact/hooks';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import AppLayout from '../components/layout/AppLayout.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
@@ -105,7 +105,10 @@ export default function Surat() {
    * Mengambil data arsip surat, data siswa, dan setting kop surat sekolah.
    * Settings diambil lebih dulu agar bulanMulaiTahunAjaran tersedia untuk query surat.
    */
+  const loadSeq = useRef(0); // penanda permintaan terbaru agar respons lama tidak menimpa
+
   async function loadData(targetPeriode = selectedPeriode) {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setLoadError(null);
     try {
@@ -118,7 +121,7 @@ export default function Surat() {
         fetchSuratByPeriode(targetPeriode, settingsData),
         siswaService.getAktif()
       ]);
-      setSuratList(suratData);
+      if (seq === loadSeq.current) setSuratList(suratData);
 
       let finalSiswaList = siswaData;
 
@@ -168,7 +171,7 @@ export default function Surat() {
       setLoadError(msg);
       showToast(msg, 'error');
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }
 
@@ -177,17 +180,20 @@ export default function Surat() {
    * Tidak memuat ulang data siswa maupun konfigurasi sekolah.
    */
   async function reloadSuratOnly(newPeriode) {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setLoadError(null);
     try {
       const suratData = await fetchSuratByPeriode(newPeriode, settings);
+      if (seq !== loadSeq.current) return;
       setSuratList(suratData);
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       const msg = friendlyError(err, 'Gagal memuat arsip surat');
       setLoadError(msg);
       showToast(msg, 'error');
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }
 
