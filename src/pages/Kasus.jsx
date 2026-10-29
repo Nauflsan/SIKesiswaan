@@ -26,12 +26,12 @@ import AppLayout from '../components/layout/AppLayout.jsx';
 import { KasusStatusBadge, PoinBadge } from '../components/ui/Badge.jsx';
 import Modal from '../components/ui/Modal.jsx';
 import CreatableCombobox from '../components/ui/CreatableCombobox.jsx';
-import { kasusService, kategoriService } from '../services/index.js';
+import { kasusService, kategoriService, settingsService } from '../services/index.js';
 import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
-import { formatTanggal } from '../lib/helpers.js';
+import { formatTanggal, getRentangPeriodePreset } from '../lib/helpers.js';
 import {
   Search,
   Filter,
@@ -51,10 +51,12 @@ export default function Kasus() {
   // State penyimpanan data dari API / Service
   const [rawKasusList, setRawKasusList] = useState([]);
   const [kategoriList, setKategoriList] = useState([]);
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
   // State Filter
+  const [selectedPeriode, setSelectedPeriode] = useState('tahun_ajaran_ini');
   const [search, setSearch] = useState('');
   const [selectedKelas, setSelectedKelas] = useState('semua');
   const [selectedKategori, setSelectedKategori] = useState('semua');
@@ -65,25 +67,35 @@ export default function Kasus() {
   const [deleteConfirmKasus, setDeleteConfirmKasus] = useState(null);
 
   /**
-   * Hook pemuatan data: Berjalan HANYA 1x saat komponen dipasang (mount).
-   * Perubahan filter dropdown ditangani secara in-memory (useMemo) untuk menghemat kuota Firestore.
+   * Mengambil data kasus berdasarkan periode yang dipilih.
+   * Kategori dan pengaturan sekolah dimuat sekali saja saat mount untuk menghemat kuota Firestore.
    */
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  /**
-   * Mengambil data kasus dan kategori dari service layer.
-   */
-  async function loadData() {
+  async function loadData(periodeToLoad = selectedPeriode) {
     setLoading(true);
     setLoadError(null);
     try {
-      const [kategoriData, data] = await Promise.all([
-        kategoriService.getAll(),
-        kasusService.getAll()
-      ]);
-      setKategoriList(kategoriData);
+      let currentSettings = settings;
+      if (!currentSettings) {
+        const [kategoriData, fetchedSettings] = await Promise.all([
+          kategoriService.getAll(),
+          settingsService.get().catch(() => ({ bulanMulaiTahunAjaran: 7 }))
+        ]);
+        setKategoriList(kategoriData);
+        currentSettings = fetchedSettings || { bulanMulaiTahunAjaran: 7 };
+        setSettings(currentSettings);
+      }
+
+      let data = [];
+      if (periodeToLoad === 'semua') {
+        data = await kasusService.getAll();
+      } else {
+        const bm = currentSettings?.bulanMulaiTahunAjaran || 7;
+        const rentang = getRentangPeriodePreset(periodeToLoad, bm);
+        data = await kasusService.getByPeriode({
+          tanggalMulai: rentang.tanggalMulai,
+          tanggalSelesai: rentang.tanggalSelesai
+        });
+      }
       setRawKasusList(data);
     } catch (err) {
       const msg = friendlyError(err, 'Gagal memuat data kasus');
@@ -93,6 +105,16 @@ export default function Kasus() {
       setLoading(false);
     }
   }
+
+  /**
+   * Hook pemuatan data:
+   * Bergantung pada selectedPeriode.
+   * Saat mount: memuat settings & kategori lebih dulu, lalu kasus.
+   * Saat selectedPeriode berubah: hanya memuat ulang data kasus.
+   */
+  useEffect(() => {
+    loadData(selectedPeriode);
+  }, [selectedPeriode]);
 
   // Daftar opsi kelas dinamis yang diekstrak dari master data kasus
   const distinctKelas = useMemo(() => Array.from(
@@ -127,6 +149,13 @@ export default function Kasus() {
     }
     return list;
   }, [rawKasusList, selectedKelas, selectedKategori, selectedStatus, search]);
+
+  // Label periode untuk informasi ringkasan dan keterangan pencarian
+  const periodeLabel = useMemo(() => {
+    if (selectedPeriode === 'semua') return 'Semua Riwayat';
+    const bm = settings?.bulanMulaiTahunAjaran || 7;
+    return getRentangPeriodePreset(selectedPeriode, bm).label;
+  }, [selectedPeriode, settings]);
 
   /**
    * Handler submit form pencarian teks (in-memory, tidak perlu refetch)
@@ -201,60 +230,79 @@ export default function Kasus() {
       </div>
 
       {/* Filter Chips / Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-200/80 mb-6 shadow-xs flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 pr-2 border-r border-gray-100">
-          <Filter className="w-3.5 h-3.5" />
-          <span>Filter:</span>
+      <div className="bg-white p-4 rounded-2xl border border-gray-200/80 mb-6 shadow-xs flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 pr-2 border-r border-gray-100">
+            <Filter className="w-3.5 h-3.5" />
+            <span>Filter:</span>
+          </div>
+
+          {/* Periode Filter */}
+          <CreatableCombobox
+            value={selectedPeriode}
+            onChange={setSelectedPeriode}
+            options={[
+              { value: 'tahun_ajaran_ini', label: 'Tahun Ajaran Ini' },
+              { value: 'semester_ganjil', label: 'Semester Ganjil' },
+              { value: 'semester_genap', label: 'Semester Genap' },
+              { value: 'semua', label: 'Semua Riwayat' }
+            ]}
+            variant="pill"
+          />
+
+          {/* Kelas Filter */}
+          <CreatableCombobox
+            value={selectedKelas}
+            onChange={setSelectedKelas}
+            options={distinctKelas}
+            allOptionLabel="Semua Kelas"
+            allOptionValue="semua"
+            variant="pill"
+          />
+
+          {/* Kategori Filter */}
+          <CreatableCombobox
+            value={selectedKategori}
+            onChange={setSelectedKategori}
+            options={kategoriList.map(kat => ({ value: kat.id, label: kat.nama }))}
+            allOptionLabel="Semua Kategori"
+            allOptionValue="semua"
+            variant="pill"
+          />
+
+          {/* Status Filter */}
+          <CreatableCombobox
+            value={selectedStatus}
+            onChange={setSelectedStatus}
+            options={[
+              { value: 'baru', label: 'Baru' },
+              { value: 'ditangani', label: 'Sedang Ditangani' },
+              { value: 'selesai', label: 'Selesai' }
+            ]}
+            allOptionLabel="Semua Status"
+            allOptionValue="semua"
+            variant="pill"
+          />
+
+          {(selectedKelas !== 'semua' || selectedKategori !== 'semua' || selectedStatus !== 'semua' || search) && (
+            <button
+              onClick={() => {
+                setSearch('');
+                setSelectedKelas('semua');
+                setSelectedKategori('semua');
+                setSelectedStatus('semua');
+              }}
+              className="text-xs text-rose-600 hover:text-rose-800 font-semibold ml-auto flex items-center gap-1 cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset Filter</span>
+            </button>
+          )}
         </div>
 
-        {/* Kelas Filter */}
-        <CreatableCombobox
-          value={selectedKelas}
-          onChange={setSelectedKelas}
-          options={distinctKelas}
-          allOptionLabel="Semua Kelas"
-          allOptionValue="semua"
-          variant="pill"
-        />
-
-        {/* Kategori Filter */}
-        <CreatableCombobox
-          value={selectedKategori}
-          onChange={setSelectedKategori}
-          options={kategoriList.map(kat => ({ value: kat.id, label: kat.nama }))}
-          allOptionLabel="Semua Kategori"
-          allOptionValue="semua"
-          variant="pill"
-        />
-
-        {/* Status Filter */}
-        <CreatableCombobox
-          value={selectedStatus}
-          onChange={setSelectedStatus}
-          options={[
-            { value: 'baru', label: 'Baru' },
-            { value: 'ditangani', label: 'Sedang Ditangani' },
-            { value: 'selesai', label: 'Selesai' }
-          ]}
-          allOptionLabel="Semua Status"
-          allOptionValue="semua"
-          variant="pill"
-        />
-
-        {(selectedKelas !== 'semua' || selectedKategori !== 'semua' || selectedStatus !== 'semua' || search) && (
-          <button
-            onClick={() => {
-              setSearch('');
-              setSelectedKelas('semua');
-              setSelectedKategori('semua');
-              setSelectedStatus('semua');
-            }}
-            className="text-xs text-rose-600 hover:text-rose-800 font-semibold ml-auto flex items-center gap-1"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span>Reset Filter</span>
-          </button>
-        )}
+        <p className="text-[11px] text-gray-500">
+          Menampilkan kasus periode {periodeLabel}. Pencarian hanya mencakup periode ini; pilih &quot;Semua Riwayat&quot; untuk mencari seluruhnya.
+        </p>
       </div>
 
       {/* Main Table Card */}

@@ -31,7 +31,7 @@ import { friendlyError } from '../lib/errors.js';
 import LoadError from '../components/ui/LoadError.jsx';
 import { useAuthStore } from '../stores/authStore.js';
 import { useUIStore } from '../stores/uiStore.js';
-import { formatTanggal } from '../lib/helpers.js';
+import { formatTanggal, getRentangPeriodePreset } from '../lib/helpers.js';
 import {
   Printer,
   Plus,
@@ -48,6 +48,9 @@ export default function Surat() {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+
+  // State Filter Periode
+  const [selectedPeriode, setSelectedPeriode] = useState('tahun_ajaran_ini');
 
   // State Modal Penerbitan Surat Baru
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -71,24 +74,51 @@ export default function Surat() {
   const [previewSurat, setPreviewSurat] = useState(null);
   const [previewKasusList, setPreviewKasusList] = useState([]);
 
+  // Label periode untuk heading/informasi jumlah surat
+  const periodeLabel = useMemo(() => {
+    if (selectedPeriode === 'semua') {
+      return 'seluruh riwayat';
+    }
+    const bm = settings?.bulanMulaiTahunAjaran || 7;
+    return getRentangPeriodePreset(selectedPeriode, bm).label;
+  }, [selectedPeriode, settings]);
+
+  /**
+   * Helper untuk memuat surat berdasarkan periode.
+   */
+  async function fetchSuratByPeriode(periode, currentSettings) {
+    if (periode === 'semua') {
+      return await suratService.getAll();
+    }
+    const bm = currentSettings?.bulanMulaiTahunAjaran || 7;
+    const rentang = getRentangPeriodePreset(periode, bm);
+    const isoMulai = new Date(`${rentang.tanggalMulai}T00:00:00`).toISOString();
+    const isoSelesai = new Date(`${rentang.tanggalSelesai}T23:59:59.999`).toISOString();
+    return await suratService.getByPeriode({ isoMulai, isoSelesai });
+  }
+
   useEffect(() => {
     loadData();
   }, []);
 
   /**
-   * Mengambil data arsip surat, data siswa, dan setting kop surat sekolah
+   * Mengambil data arsip surat, data siswa, dan setting kop surat sekolah.
+   * Settings diambil lebih dulu agar bulanMulaiTahunAjaran tersedia untuk query surat.
    */
-  async function loadData() {
+  async function loadData(targetPeriode = selectedPeriode) {
     setLoading(true);
     setLoadError(null);
     try {
-      const [suratData, siswaData, settingsData] = await Promise.all([
-        suratService.getAll(),
-        siswaService.getAktif(),
-        settingsService.get()
+      // 1. Ambil settings lebih dulu (butuh bulanMulaiTahunAjaran)
+      const settingsData = await settingsService.get();
+      setSettings(settingsData);
+
+      // 2. Ambil surat per periode dan siswa aktif secara paralel
+      const [suratData, siswaData] = await Promise.all([
+        fetchSuratByPeriode(targetPeriode, settingsData),
+        siswaService.getAktif()
       ]);
       setSuratList(suratData);
-      setSettings(settingsData);
 
       let finalSiswaList = siswaData;
 
@@ -116,7 +146,14 @@ export default function Surat() {
       setSiswaList(finalSiswaList);
 
       if (suratId) {
-        const found = suratData.find(s => s.id === suratId);
+        let found = suratData.find(s => s.id === suratId);
+        if (!found) {
+          try {
+            found = await suratService.getById(suratId);
+          } catch {
+            // Bila getById gagal: diam
+          }
+        }
         if (found) {
           setPreviewSurat(found);
         }
@@ -134,6 +171,33 @@ export default function Surat() {
       setLoading(false);
     }
   }
+
+  /**
+   * Pemuatan ulang HANYA daftar surat saat filter periode berganti.
+   * Tidak memuat ulang data siswa maupun konfigurasi sekolah.
+   */
+  async function reloadSuratOnly(newPeriode) {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const suratData = await fetchSuratByPeriode(newPeriode, settings);
+      setSuratList(suratData);
+    } catch (err) {
+      const msg = friendlyError(err, 'Gagal memuat arsip surat');
+      setLoadError(msg);
+      showToast(msg, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handler pergantian opsi periode pada combobox
+   */
+  const handlePeriodeChange = (newPeriode) => {
+    setSelectedPeriode(newPeriode);
+    reloadSuratOnly(newPeriode);
+  };
 
   /**
    * Mengambil riwayat kasus siswa yang dipilih agar dapat dicantumkan pada surat
@@ -193,7 +257,7 @@ export default function Surat() {
 
       showToast(`Surat ${created.nomorSurat} berhasil dibuat!`, 'success');
       setShowCreateModal(false);
-      loadData();
+      loadData(selectedPeriode);
       setPreviewSurat(created); // Langsung buka pratinjau surat
     } catch (err) {
       showToast(err.message || 'Gagal menerbitkan surat', 'error');
@@ -215,10 +279,21 @@ export default function Surat() {
       subtitle="Penerbitan surat resmi kedisiplinan sekolah berstandar administratif"
     >
       {/* Top Bar */}
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <CreatableCombobox
+            value={selectedPeriode}
+            onChange={handlePeriodeChange}
+            options={[
+              { value: 'tahun_ajaran_ini', label: 'Tahun Ajaran Ini' },
+              { value: 'semester_ganjil', label: 'Semester Ganjil' },
+              { value: 'semester_genap', label: 'Semester Genap' },
+              { value: 'semua', label: 'Semua Riwayat' }
+            ]}
+            variant="pill"
+          />
           <span className="text-xs font-semibold text-gray-500">
-            Total {suratList.length} surat telah diterbitkan
+            Total {suratList.length} surat pada {periodeLabel}
           </span>
         </div>
         <button
@@ -226,7 +301,7 @@ export default function Surat() {
             setSelectedSiswaId('');
             setShowCreateModal(true);
           }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-semibold rounded-xl shadow-xs transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#4A6FA5] hover:bg-[#3b5b88] text-white text-xs font-semibold rounded-xl shadow-xs transition-all shrink-0 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Buat Surat SP Baru</span>
@@ -254,7 +329,7 @@ export default function Surat() {
                 <tr>
                   <td colSpan="8" className="py-12 text-center text-gray-400">
                     {loadError ? (
-                      <LoadError message={loadError} onRetry={loadData} />
+                      <LoadError message={loadError} onRetry={() => loadData(selectedPeriode)} />
                     ) : loading ? (
                       'Memuat data surat...'
                     ) : (

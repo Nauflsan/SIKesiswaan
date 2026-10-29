@@ -43,6 +43,32 @@ export const firebaseSuratService = {
   },
 
   /**
+   * Mengambil arsip surat peringatan berdasarkan rentang ISO timestamp.
+   * Query satu field tanpa orderBy untuk mencegah kebutuhan indeks komposit Firestore.
+   * Pengurutan menurun menurut createdAt dilakukan di sisi klien.
+   *
+   * @param {Object} params
+   * @param {string} params.isoMulai - ISO 8601 string batas bawah
+   * @param {string} params.isoSelesai - ISO 8601 string batas atas
+   * @returns {Promise<Array>}
+   */
+  getByPeriode: async ({ isoMulai, isoSelesai } = {}) => {
+    if (!isoMulai || !isoSelesai) {
+      throw new Error('Parameter isoMulai dan isoSelesai wajib diisi');
+    }
+
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('createdAt', '>=', isoMulai),
+      where('createdAt', '<=', isoSelesai)
+    );
+
+    const snap = await getDocs(q);
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  },
+
+  /**
    * Mengambil riwayat surat peringatan milik satu siswa tertentu (Query Firestore langsung).
    * Mencegah full-scan koleksi surat saat membuka profil siswa di SiswaDetail.
    *
